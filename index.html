@@ -38,6 +38,21 @@
       width: 100vw;
       height: 100vh;
       overflow: hidden;
+      display: flex;
+    }
+    
+    #camera-section {
+      width: 50%;
+      height: 100%;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    #game-section {
+      width: 50%;
+      height: 100%;
+      position: relative;
+      overflow: hidden;
     }
     
     #start-screen, #game-over-screen {
@@ -102,8 +117,8 @@
       position: absolute;
       top: 0;
       left: 0;
-      width: 100vw;
-      height: 100vh;
+      width: 100%;
+      height: 100%;
       z-index: 2;
     }
     
@@ -111,32 +126,20 @@
       position: absolute;
       top: 0;
       left: 0;
-      width: 100vw;
-      height: 100vh;
-      object-fit: cover;
-      z-index: 1;
-      transform: scaleX(-1); /* مرآة للكاميرا */
-      filter: brightness(0.7) contrast(1.2);
-    }
-    
-    #camera-view {
-      position: absolute;
-      bottom: 20px;
-      right: 20px;
-      width: 200px;
-      height: 150px;
-      border: 3px solid var(--primary-color);
-      border-radius: 10px;
-      overflow: hidden;
-      z-index: 5;
-      box-shadow: 0 0 15px rgba(0, 255, 0, 0.5);
-    }
-    
-    #camera-view video {
       width: 100%;
       height: 100%;
       object-fit: cover;
+      z-index: 1;
       transform: scaleX(-1); /* مرآة للكاميرا */
+    }
+    
+    #hand-canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 3;
     }
     
     #score-display {
@@ -208,6 +211,32 @@
       border: 2px solid var(--accent-color);
       max-width: 250px;
     }
+    
+    #camera-label {
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 1.2rem;
+      z-index: 5;
+      background: rgba(0, 0, 0, 0.7);
+      padding: 10px 15px;
+      border-radius: 10px;
+      border: 2px solid var(--primary-color);
+    }
+    
+    #game-label {
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 1.2rem;
+      z-index: 5;
+      background: rgba(0, 0, 0, 0.7);
+      padding: 10px 15px;
+      border-radius: 10px;
+      border: 2px solid var(--primary-color);
+    }
   </style>
 </head>
 <body>
@@ -228,26 +257,31 @@
       <button id="restart-btn" class="btn">العب مرة أخرى</button>
     </div>
     
-    <div id="score-display">النقاط: 0</div>
-    <div id="ai-assist">المساعدة الذكية: نشطة</div>
-    <div id="instructions">حرك إصبعك للتحكم في الثعبان</div>
-    
-    <div id="camera-view">
-      <video id="camera-preview" autoplay playsinline></video>
+    <!-- قسم الكاميرا -->
+    <div id="camera-section">
+      <div id="camera-label">كاميرا التحكم</div>
+      <video id="video" autoplay playsinline></video>
+      <canvas id="hand-canvas"></canvas>
+      <div class="hand-indicator" id="hand-indicator"></div>
     </div>
     
-    <video id="video" autoplay playsinline></video>
-    <canvas id="canvas"></canvas>
-    
-    <div class="hand-indicator" id="hand-indicator"></div>
+    <!-- قسم اللعبة -->
+    <div id="game-section">
+      <div id="game-label">لعبة الثعبان</div>
+      <canvas id="canvas"></canvas>
+      <div id="score-display">النقاط: 0</div>
+      <div id="ai-assist">المساعدة الذكية: نشطة</div>
+      <div id="instructions">حرك إصبعك للتحكم في الثعبان</div>
+    </div>
   </div>
 
   <script>
     // عناصر DOM
     const video = document.getElementById("video");
-    const cameraPreview = document.getElementById("camera-preview");
     const canvas = document.getElementById("canvas");
+    const handCanvas = document.getElementById("hand-canvas");
     const ctx = canvas.getContext("2d");
+    const handCtx = handCanvas.getContext("2d");
     const startScreen = document.getElementById("start-screen");
     const gameOverScreen = document.getElementById("game-over-screen");
     const startBtn = document.getElementById("start-btn");
@@ -290,8 +324,15 @@
 
     // ضبط حجم canvas
     function resizeCanvas() {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
+      const gameSection = document.getElementById('game-section');
+      const cameraSection = document.getElementById('camera-section');
+      
+      canvas.width = gameSection.clientWidth;
+      canvas.height = gameSection.clientHeight;
+      
+      handCanvas.width = cameraSection.clientWidth;
+      handCanvas.height = cameraSection.clientHeight;
+      
       if (gameActive) {
         // إعادة تعيين موقع الثعبان والطعام إذا تغير حجم الشاشة
         snake[0] = {x: canvas.width/2, y: canvas.height/2};
@@ -304,13 +345,12 @@
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
           video: { 
-            facingMode: "user",
+            facingMode: "environment", // استخدام الكاميرا الخلفية
             width: { ideal: 640 },
             height: { ideal: 480 }
           } 
         });
         video.srcObject = stream;
-        cameraPreview.srcObject = stream;
         return new Promise(resolve => {
           video.onloadedmetadata = () => {
             video.width = video.videoWidth;
@@ -320,8 +360,27 @@
         });
       } catch (error) {
         console.error("خطأ في الوصول للكاميرا:", error);
-        alert("تعذر الوصول للكاميرا. يرجى التأكد من السماح باستخدام الكاميرا وتحديث الصفحة.");
-        return null;
+        // محاولة استخدام الكاميرا الأمامية إذا فشلت الخلفية
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: { 
+              facingMode: "user",
+              width: { ideal: 640 },
+              height: { ideal: 480 }
+            } 
+          });
+          video.srcObject = stream;
+          return new Promise(resolve => {
+            video.onloadedmetadata = () => {
+              video.width = video.videoWidth;
+              video.height = video.videoHeight;
+              resolve(video);
+            };
+          });
+        } catch (error2) {
+          alert("تعذر الوصول للكاميرا. يرجى التأكد من السماح باستخدام الكاميرا وتحديث الصفحة.");
+          return null;
+        }
       }
     }
 
@@ -400,6 +459,76 @@
         }
       }
       ctx.globalAlpha = 1.0;
+    }
+
+    // رسم خيوط الذكاء الاصطناعي على اليد
+    function drawAIHandLines(predictions) {
+      handCtx.clearRect(0, 0, handCanvas.width, handCanvas.height);
+      
+      if (predictions.length > 0) {
+        const landmarks = predictions[0].landmarks;
+        
+        // رسم نقاط اليد
+        for (let i = 0; i < landmarks.length; i++) {
+          const x = landmarks[i][0] * (handCanvas.width / video.videoWidth);
+          const y = landmarks[i][1] * (handCanvas.height / video.videoHeight);
+          
+          handCtx.beginPath();
+          handCtx.arc(x, y, 4, 0, 2 * Math.PI);
+          handCtx.fillStyle = '#00ff00';
+          handCtx.fill();
+        }
+        
+        // رسم خطوط توصيل بين النقاط
+        const connections = [
+          [0, 1], [1, 2], [2, 3], [3, 4], // إبهام
+          [0, 5], [5, 6], [6, 7], [7, 8], // سبابة
+          [0, 9], [9, 10], [10, 11], [11, 12], // وسطى
+          [0, 13], [13, 14], [14, 15], [15, 16], // بنصر
+          [0, 17], [17, 18], [18, 19], [19, 20] // خنصر
+        ];
+        
+        handCtx.strokeStyle = '#ff00ff';
+        handCtx.lineWidth = 2;
+        
+        for (let i = 0; i < connections.length; i++) {
+          const start = connections[i][0];
+          const end = connections[i][1];
+          
+          const startX = landmarks[start][0] * (handCanvas.width / video.videoWidth);
+          const startY = landmarks[start][1] * (handCanvas.height / video.videoHeight);
+          const endX = landmarks[end][0] * (handCanvas.width / video.videoWidth);
+          const endY = landmarks[end][1] * (handCanvas.height / video.videoHeight);
+          
+          handCtx.beginPath();
+          handCtx.moveTo(startX, startY);
+          handCtx.lineTo(endX, endY);
+          handCtx.stroke();
+        }
+        
+        // رسم خط إضافي لإصبع السبابة (للتأكيد)
+        const indexFingerTip = landmarks[8];
+        const indexFingerBase = landmarks[5];
+        
+        const tipX = indexFingerTip[0] * (handCanvas.width / video.videoWidth);
+        const tipY = indexFingerTip[1] * (handCanvas.height / video.videoHeight);
+        const baseX = indexFingerBase[0] * (handCanvas.width / video.videoWidth);
+        const baseY = indexFingerBase[1] * (handCanvas.height / video.videoHeight);
+        
+        handCtx.strokeStyle = '#ffff00';
+        handCtx.lineWidth = 3;
+        handCtx.beginPath();
+        handCtx.moveTo(baseX, baseY);
+        handCtx.lineTo(tipX, tipY);
+        handCtx.stroke();
+        
+        // رسم دائرة حول إصبع السبابة
+        handCtx.beginPath();
+        handCtx.arc(tipX, tipY, 15, 0, 2 * Math.PI);
+        handCtx.strokeStyle = '#ffff00';
+        handCtx.lineWidth = 2;
+        handCtx.stroke();
+      }
     }
 
     // التحقق من الاصطدام
@@ -486,8 +615,12 @@
         lastPredictionTime = currentTime;
         
         const predictions = await model.estimateHands(video);
+        
+        // رسم خيوط الذكاء الاصطناعي على اليد
+        drawAIHandLines(predictions);
+        
         if (predictions.length > 0) {
-          let x = canvas.width - predictions[0].landmarks[8][0] * (canvas.width / video.videoWidth);
+          let x = predictions[0].landmarks[8][0] * (canvas.width / video.videoWidth);
           let y = predictions[0].landmarks[8][1] * (canvas.height / video.videoHeight);
           
           // تطبيق المساعدة الذكية
