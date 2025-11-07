@@ -39,18 +39,20 @@
       height: 100vh;
       overflow: hidden;
       display: flex;
+      flex-direction: row;
     }
     
     #camera-section {
-      width: 50%;
-      height: 100%;
+      width: 50vw;
+      height: 100vh;
       position: relative;
       overflow: hidden;
+      border-right: 3px solid var(--primary-color);
     }
     
     #game-section {
-      width: 50%;
-      height: 100%;
+      width: 50vw;
+      height: 100vh;
       position: relative;
       overflow: hidden;
     }
@@ -65,8 +67,8 @@
       flex-direction: column;
       justify-content: center;
       align-items: center;
-      background: rgba(0, 0, 0, 0.85);
-      z-index: 10;
+      background: rgba(0, 0, 0, 0.9);
+      z-index: 20;
       padding: 20px;
     }
     
@@ -166,6 +168,7 @@
       border-radius: 10px;
       max-width: 90%;
       border: 2px solid var(--accent-color);
+      text-align: center;
     }
     
     #loading {
@@ -237,6 +240,52 @@
       border-radius: 10px;
       border: 2px solid var(--primary-color);
     }
+
+    #time-display {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      font-size: 1.5rem;
+      z-index: 5;
+      background: rgba(0, 0, 0, 0.7);
+      padding: 10px 15px;
+      border-radius: 10px;
+      border: 2px solid var(--accent-color);
+    }
+
+    /* تصميم متجاوب للشاشات الصغيرة */
+    @media (max-width: 768px) {
+      #game-container {
+        flex-direction: column;
+      }
+      
+      #camera-section, #game-section {
+        width: 100vw;
+        height: 50vh;
+      }
+      
+      #camera-section {
+        border-right: none;
+        border-bottom: 3px solid var(--primary-color);
+      }
+      
+      h1 {
+        font-size: 1.8rem;
+      }
+      
+      h2 {
+        font-size: 1.5rem;
+      }
+      
+      p {
+        font-size: 1rem;
+      }
+      
+      .btn {
+        padding: 10px 25px;
+        font-size: 1rem;
+      }
+    }
   </style>
 </head>
 <body>
@@ -246,14 +295,15 @@
     <div id="start-screen">
       <h1>🐍 لعبة الثعبان باليد 🍎</h1>
       <p>استخدم إصبع السبابة للتحكم في الثعبان وتناول التفاح!</p>
-      <p>اللعبة تستخدم الذكاء الاصطناعي لتسهيل التحكم</p>
-      <p>حاول تجنب الاصطدام بنفسك!</p>
+      <p>اللعبة <strong>بدون اصطدام</strong> - استمتع باللعب بحرية!</p>
+      <p>حاول جمع أكبر عدد من النقاط!</p>
       <button id="start-btn" class="btn">ابدأ اللعب</button>
     </div>
     
     <div id="game-over-screen">
-      <h2>انتهت اللعبة!</h2>
+      <h2>انتهت الجولة!</h2>
       <p id="final-score">النقاط: 0</p>
+      <p id="final-time">الوقت: 0 ثانية</p>
       <button id="restart-btn" class="btn">العب مرة أخرى</button>
     </div>
     
@@ -270,8 +320,9 @@
       <div id="game-label">لعبة الثعبان</div>
       <canvas id="canvas"></canvas>
       <div id="score-display">النقاط: 0</div>
+      <div id="time-display">الوقت: 0 ث</div>
       <div id="ai-assist">المساعدة الذكية: نشطة</div>
-      <div id="instructions">حرك إصبعك للتحكم في الثعبان</div>
+      <div id="instructions">حرك إصبعك للتحكم في الثعبان - لا يوجد اصطدام!</div>
     </div>
   </div>
 
@@ -287,7 +338,9 @@
     const startBtn = document.getElementById("start-btn");
     const restartBtn = document.getElementById("restart-btn");
     const scoreDisplay = document.getElementById("score-display");
+    const timeDisplay = document.getElementById("time-display");
     const finalScore = document.getElementById("final-score");
+    const finalTime = document.getElementById("final-time");
     const loading = document.getElementById("loading");
     const instructions = document.getElementById("instructions");
     const handIndicator = document.getElementById("hand-indicator");
@@ -301,12 +354,15 @@
     let score = 0;
     let gameActive = false;
     let lastPredictionTime = 0;
-    let predictionInterval = 80; // تحديث أسرع لتجربة أفضل
+    let predictionInterval = 80;
     let particles = [];
     let lastHandPosition = { x: 0, y: 0 };
     let handDetected = false;
     let aiAssistActive = true;
-    let assistLevel = 0.7; // مستوى المساعدة (0-1)
+    let assistLevel = 0.7;
+    let startTime = 0;
+    let gameTime = 0;
+    let gameTimer = null;
 
     // تهيئة اللعبة
     function initGame() {
@@ -314,12 +370,31 @@
       randomFood();
       maxLength = 50;
       score = 0;
+      gameTime = 0;
       updateScore();
+      updateTime();
       gameActive = true;
       handDetected = false;
       aiAssistActive = true;
       assistLevel = 0.7;
       updateAIAssistDisplay();
+      
+      // بدء عداد الوقت
+      startTime = Date.now();
+      if (gameTimer) clearInterval(gameTimer);
+      gameTimer = setInterval(updateGameTime, 1000);
+    }
+
+    // تحديث الوقت
+    function updateGameTime() {
+      if (gameActive) {
+        gameTime = Math.floor((Date.now() - startTime) / 1000);
+        updateTime();
+      }
+    }
+
+    function updateTime() {
+      timeDisplay.textContent = `الوقت: ${gameTime} ث`;
     }
 
     // ضبط حجم canvas
@@ -334,7 +409,6 @@
       handCanvas.height = cameraSection.clientHeight;
       
       if (gameActive) {
-        // إعادة تعيين موقع الثعبان والطعام إذا تغير حجم الشاشة
         snake[0] = {x: canvas.width/2, y: canvas.height/2};
         randomFood();
       }
@@ -345,7 +419,7 @@
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
           video: { 
-            facingMode: "environment", // استخدام الكاميرا الخلفية
+            facingMode: "environment",
             width: { ideal: 640 },
             height: { ideal: 480 }
           } 
@@ -359,8 +433,7 @@
           };
         });
       } catch (error) {
-        console.error("خطأ في الوصول للكاميرا:", error);
-        // محاولة استخدام الكاميرا الأمامية إذا فشلت الخلفية
+        console.error("خطأ في الوصول للكاميرا الخلفية:", error);
         try {
           const stream = await navigator.mediaDevices.getUserMedia({
             video: { 
@@ -389,13 +462,8 @@
       loading.style.display = "block";
       
       try {
-        // إعداد TensorFlow.js
         await tf.setBackend('webgl');
-        
-        // تحميل نموذج handpose
         model = await handpose.load();
-        
-        // إعداد الكاميرا
         const cameraReady = await setupCamera();
         if (!cameraReady) return;
         
@@ -481,11 +549,11 @@
         
         // رسم خطوط توصيل بين النقاط
         const connections = [
-          [0, 1], [1, 2], [2, 3], [3, 4], // إبهام
-          [0, 5], [5, 6], [6, 7], [7, 8], // سبابة
-          [0, 9], [9, 10], [10, 11], [11, 12], // وسطى
-          [0, 13], [13, 14], [14, 15], [15, 16], // بنصر
-          [0, 17], [17, 18], [18, 19], [19, 20] // خنصر
+          [0, 1], [1, 2], [2, 3], [3, 4],
+          [0, 5], [5, 6], [6, 7], [7, 8],
+          [0, 9], [9, 10], [10, 11], [11, 12],
+          [0, 13], [13, 14], [14, 15], [15, 16],
+          [0, 17], [17, 18], [18, 19], [19, 20]
         ];
         
         handCtx.strokeStyle = '#ff00ff';
@@ -506,7 +574,7 @@
           handCtx.stroke();
         }
         
-        // رسم خط إضافي لإصبع السبابة (للتأكيد)
+        // تمييز إصبع السبابة
         const indexFingerTip = landmarks[8];
         const indexFingerBase = landmarks[5];
         
@@ -528,76 +596,29 @@
         handCtx.strokeStyle = '#ffff00';
         handCtx.lineWidth = 2;
         handCtx.stroke();
+        
+        // إضافة نص توضيحي
+        handCtx.fillStyle = '#ffffff';
+        handCtx.font = '16px Arial';
+        handCtx.fillText('إصبع التحكم', tipX - 40, tipY - 20);
       }
     }
 
-    // التحقق من الاصطدام
-    function checkCollision() {
-      const head = snake[snake.length - 1];
-      
-      // التحقق من الاصطدام بالجدران
-      if (head.x < 0 || head.x > canvas.width || head.y < 0 || head.y > canvas.height) {
-        return true;
-      }
-      
-      // التحقق من الاصطدام بالنفس (بدءاً من العنصر الرابع لتجنب الاصطدام بالعناصر القريبة)
-      for (let i = 0; i < snake.length - 10; i++) {
-        const dx = head.x - snake[i].x;
-        const dy = head.y - snake[i].y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        
-        if (dist < 15) {
-          return true;
-        }
-      }
-      
-      return false;
-    }
-    
-    // المساعدة الذكية - جعل اللعبة أسهل
+    // المساعدة الذكية - فقط لتوجيه نحو الطعام
     function applyAIAssist(targetX, targetY) {
       if (!aiAssistActive) return { x: targetX, y: targetY };
       
       const head = snake[snake.length - 1];
       
-      // إذا كان الهدف قريباً من الطعام، توجيه نحو الطعام
+      // توجيه نحو الطعام فقط
       const dxToFood = food.x - head.x;
       const dyToFood = food.y - head.y;
       const distToFood = Math.sqrt(dxToFood * dxToFood + dyToFood * dyToFood);
       
       if (distToFood < 200) {
-        // توجيه جزئي نحو الطعام
         const foodWeight = assistLevel * (1 - distToFood / 200);
         targetX = targetX * (1 - foodWeight) + food.x * foodWeight;
         targetY = targetY * (1 - foodWeight) + food.y * foodWeight;
-      }
-      
-      // تجنب الاصطدام بالنفس
-      for (let i = 0; i < snake.length - 5; i++) {
-        const dxToBody = head.x - snake[i].x;
-        const dyToBody = head.y - snake[i].y;
-        const distToBody = Math.sqrt(dxToBody * dxToBody + dyToBody * dyToBody);
-        
-        if (distToBody < 50) {
-          // تجنب الجزء من الجسم
-          const avoidWeight = assistLevel * (1 - distToBody / 50);
-          targetX = targetX + (dxToBody / distToBody) * 30 * avoidWeight;
-          targetY = targetY + (dyToBody / distToBody) * 30 * avoidWeight;
-        }
-      }
-      
-      // تجنب الجدران
-      const wallMargin = 50;
-      if (head.x < wallMargin) {
-        targetX = Math.max(targetX, head.x + 10);
-      } else if (head.x > canvas.width - wallMargin) {
-        targetX = Math.min(targetX, head.x - 10);
-      }
-      
-      if (head.y < wallMargin) {
-        targetY = Math.max(targetY, head.y + 10);
-      } else if (head.y > canvas.height - wallMargin) {
-        targetY = Math.min(targetY, head.y - 10);
       }
       
       return { x: targetX, y: targetY };
@@ -609,39 +630,31 @@
       
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       
-      // تحديث التنبؤات بفاصل زمني لتقليل الحمل
       const currentTime = Date.now();
       if (currentTime - lastPredictionTime > predictionInterval) {
         lastPredictionTime = currentTime;
         
         const predictions = await model.estimateHands(video);
-        
-        // رسم خيوط الذكاء الاصطناعي على اليد
         drawAIHandLines(predictions);
         
         if (predictions.length > 0) {
           let x = predictions[0].landmarks[8][0] * (canvas.width / video.videoWidth);
           let y = predictions[0].landmarks[8][1] * (canvas.height / video.videoHeight);
           
-          // تطبيق المساعدة الذكية
           const assistedTarget = applyAIAssist(x, y);
           x = assistedTarget.x;
           y = assistedTarget.y;
           
-          // تحديث مؤشر اليد
           handIndicator.style.display = 'block';
           handIndicator.style.left = (x - 15) + 'px';
           handIndicator.style.top = (y - 15) + 'px';
           
-          // تسجيل آخر موقع للتحقق من استمرار الكشف
           lastHandPosition = { x, y };
           handDetected = true;
           
-          // إضافة نقطة جديدة للثعبان
           snake.push({x, y});
           if (snake.length > maxLength) snake.shift();
           
-          // التحقق من أكل الطعام
           const dx = x - food.x;
           const dy = y - food.y;
           const dist = Math.sqrt(dx * dx + dy * dy);
@@ -653,61 +666,13 @@
             score++;
             updateScore();
             
-            // تقليل مستوى المساعدة تدريجياً مع زيادة النقاط
             if (score % 5 === 0 && assistLevel > 0.2) {
               assistLevel -= 0.1;
             }
-            
-            // إضافة تأثير صوتي (محاكاة)
-            try {
-              const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-              const oscillator = audioContext.createOscillator();
-              const gainNode = audioContext.createGain();
-              
-              oscillator.connect(gainNode);
-              gainNode.connect(audioContext.destination);
-              
-              oscillator.frequency.value = 800;
-              gainNode.gain.value = 0.1;
-              
-              oscillator.start();
-              gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.2);
-              oscillator.stop(audioContext.currentTime + 0.2);
-            } catch (e) {
-              console.log("تعذر تشغيل الصوت");
-            }
-          }
-          
-          // التحقق من الاصطدام
-          if (checkCollision()) {
-            gameOver();
-            return;
           }
         } else {
-          // إخفاء مؤشر اليد إذا لم يتم الكشف عن يد
           handIndicator.style.display = 'none';
           handDetected = false;
-          
-          // إذا لم يتم الكشف عن اليد، استمر في الحركة في الاتجاه الأخير
-          if (handDetected && snake.length > 1) {
-            const lastSegment = snake[snake.length - 1];
-            const secondLastSegment = snake[snake.length - 2];
-            const dx = lastSegment.x - secondLastSegment.x;
-            const dy = lastSegment.y - secondLastSegment.y;
-            
-            snake.push({
-              x: lastSegment.x + dx * 0.5,
-              y: lastSegment.y + dy * 0.5
-            });
-            
-            if (snake.length > maxLength) snake.shift();
-            
-            // التحقق من الاصطدام
-            if (checkCollision()) {
-              gameOver();
-              return;
-            }
-          }
         }
       }
       
@@ -754,7 +719,6 @@
       ctx.beginPath();
       ctx.arc(food.x, food.y, 20, 0, Math.PI * 2);
       
-      // تدرج لوني للتفاحة
       const gradient = ctx.createRadialGradient(
         food.x - 5, food.y - 5, 5,
         food.x, food.y, 20
@@ -779,37 +743,18 @@
       ctx.fillStyle = '#00cc00';
       ctx.fill();
       
-      // تحديث ورسم الجسيمات
       updateParticles();
-      
       requestAnimationFrame(drawLoop);
     }
 
-    // نهاية اللعبة
-    function gameOver() {
+    // إنهاء اللعبة يدويًا (يمكن إضافة زر إنهاء)
+    function endGame() {
       gameActive = false;
       finalScore.textContent = `النقاط: ${score}`;
+      finalTime.textContent = `الوقت: ${gameTime} ثانية`;
       gameOverScreen.style.display = "flex";
       handIndicator.style.display = 'none';
-      
-      // تأثير صوتي لنهاية اللعبة
-      try {
-        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        const oscillator = audioContext.createOscillator();
-        const gainNode = audioContext.createGain();
-        
-        oscillator.connect(gainNode);
-        gainNode.connect(audioContext.destination);
-        
-        oscillator.frequency.value = 200;
-        gainNode.gain.value = 0.1;
-        
-        oscillator.start();
-        gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.5);
-        oscillator.stop(audioContext.currentTime + 0.5);
-      } catch (e) {
-        console.log("تعذر تشغيل الصوت");
-      }
+      if (gameTimer) clearInterval(gameTimer);
     }
 
     // مستمعي الأحداث
@@ -826,11 +771,14 @@
       drawLoop();
     });
 
-    // تبديل المساعدة الذكية بالضغط على المسافة
+    // إضافة زر إنهاء اللعبة يدويًا بالضغط على ESC
     document.addEventListener('keydown', (e) => {
       if (e.code === 'Space' && gameActive) {
         aiAssistActive = !aiAssistActive;
         updateAIAssistDisplay();
+      }
+      if (e.code === 'Escape' && gameActive) {
+        endGame();
       }
     });
 
