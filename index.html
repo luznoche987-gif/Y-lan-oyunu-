@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>🐍 لعبة الثعبان باليد 🍎</title>
+  <title>🐍 لعبة الثعبان بالتحكم الذكي باليد 🍎</title>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/handpose"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl"></script>
@@ -310,6 +310,19 @@
       z-index: 4;
       pointer-events: none;
     }
+    
+    .control-tip {
+      position: absolute;
+      background: rgba(0, 0, 0, 0.7);
+      color: var(--primary-color);
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      z-index: 6;
+      border: 1px solid var(--primary-color);
+      max-width: 200px;
+      text-align: center;
+    }
 
     /* تصميم متجاوب للشاشات الصغيرة */
     @media (max-width: 768px) {
@@ -360,7 +373,7 @@
     <div id="loading">جاري تحميل النموذج...</div>
     
     <div id="start-screen">
-      <h1>🐍 لعبة الثعبان باليد 🍎</h1>
+      <h1>🐍 لعبة الثعبان بالتحكم الذكي باليد 🍎</h1>
       <p>استخدم إصبع السبابة للتحكم في الثعبان وتناول التفاح!</p>
       <p>اللعبة <strong>بدون اصطدام</strong> - استمتع باللعب بحرية!</p>
       <p>حاول جمع أكبر عدد من النقاط!</p>
@@ -373,17 +386,18 @@
       
       <div class="project-details">
         <h3>وصف المشروع:</h3>
-        <p>لعبة الثعبان التقليدية بتقنية التحكم باليد باستخدام الذكاء الاصطناعي. 
+        <p>لعبة الثعبان التقليدية بتقنية التحكم الذكي باليد باستخدام الذكاء الاصطناعي المتقدم. 
            تستخدم اللعبة نموذج Handpose من TensorFlow.js للكشف عن حركة اليد 
            والتحكم في الثعبان باستخدام إصبع السبابة.</p>
         
         <h3>المميزات:</h3>
-        <p>• التحكم بالثعبان باستخدام حركة اليد</p>
-        <p>• نظام مساعدة ذكية لتسهيل اللعب</p>
-        <p>• رسومات جميلة وتأثيرات بصرية</p>
+        <p>• التحكم الذكي بالثعبان باستخدام حركة اليد</p>
+        <p>• نظام مساعدة ذكية متقدمة لتسهيل اللعب</p>
+        <p>• رسومات جميلة وتأثيرات بصرية مذهلة</p>
         <p>• واجهة مستخدم باللغة العربية</p>
         <p>• تصميم متجاوب يعمل على جميع الأجهزة</p>
         <p>• خيوط ذكية تظهر فوق اليد للتحكم</p>
+        <p>• نظام تتبع ذكي لليد</p>
         
         <h3>كيفية اللعب:</h3>
         <p>• استخدم إصبع السبابة للتحكم في حركة الثعبان</p>
@@ -414,16 +428,17 @@
     
     <!-- قسم الكاميرا -->
     <div id="camera-section">
-      <div id="camera-label">كاميرا التحكم</div>
+      <div id="camera-label">كاميرا التحكم الذكي</div>
       <video id="video" autoplay playsinline></video>
       <canvas id="hand-canvas"></canvas>
       <canvas id="hand-lines" class="hand-lines"></canvas>
       <div class="hand-indicator" id="hand-indicator"></div>
+      <div class="control-tip" id="control-tip" style="display: none;">حرك إصبع السبابة للتحكم</div>
     </div>
     
     <!-- قسم اللعبة -->
     <div id="game-section">
-      <div id="game-label">لعبة الثعبان</div>
+      <div id="game-label">لعبة الثعبان الذكية</div>
       <canvas id="canvas"></canvas>
       <div id="score-display">النقاط: 0</div>
       <div id="time-display">الوقت: 0 ثانية</div>
@@ -461,6 +476,7 @@
     const instructions = document.getElementById("instructions");
     const handIndicator = document.getElementById("hand-indicator");
     const aiAssistDisplay = document.getElementById("ai-assist");
+    const controlTip = document.getElementById("control-tip");
 
     // متغيرات اللعبة
     let model;
@@ -480,6 +496,11 @@
     let gameTime = 0;
     let gameTimer = null;
     const GROWTH_RATE = 5; // الثعبان يطول 5 بكسل عند أكل التفاحة
+    let handDetectionCount = 0;
+    let handLostCount = 0;
+    let smoothX = 0;
+    let smoothY = 0;
+    let smoothFactor = 0.7; // عامل التنعيم للحركة
 
     // تهيئة اللعبة
     function initGame() {
@@ -495,6 +516,10 @@
       handDetected = false;
       aiAssistActive = true;
       assistLevel = 0.7;
+      handDetectionCount = 0;
+      handLostCount = 0;
+      smoothX = canvas.width/2;
+      smoothY = canvas.height/2;
       updateAIAssistDisplay();
       
       // بدء عداد الوقت
@@ -727,27 +752,64 @@
         handLinesCtx.fillStyle = '#ffffff';
         handLinesCtx.font = '16px Arial';
         handLinesCtx.fillText('إصبع التحكم', tipX - 40, tipY - 20);
+        
+        // تحديث موقع نص التحكم
+        controlTip.style.display = 'block';
+        controlTip.style.left = (tipX - 80) + 'px';
+        controlTip.style.top = (tipY - 50) + 'px';
+      } else {
+        controlTip.style.display = 'none';
       }
     }
 
-    // المساعدة الذكية - فقط لتوجيه نحو الطعام
+    // المساعدة الذكية المتقدمة - توجيه نحو الطعام مع تجنب الحواف
     function applyAIAssist(targetX, targetY) {
       if (!aiAssistActive) return { x: targetX, y: targetY };
       
       const head = snake[snake.length - 1];
       
-      // توجيه نحو الطعام فقط
+      // توجيه نحو الطعام
       const dxToFood = food.x - head.x;
       const dyToFood = food.y - head.y;
       const distToFood = Math.sqrt(dxToFood * dxToFood + dyToFood * dyToFood);
       
-      if (distToFood < 200) {
-        const foodWeight = assistLevel * (1 - distToFood / 200);
-        targetX = targetX * (1 - foodWeight) + food.x * foodWeight;
-        targetY = targetY * (1 - foodWeight) + food.y * foodWeight;
+      // تجنب الحواف
+      const edgeBuffer = 50;
+      let edgeWeightX = 0;
+      let edgeWeightY = 0;
+      
+      if (head.x < edgeBuffer) {
+        edgeWeightX = (edgeBuffer - head.x) / edgeBuffer;
+      } else if (head.x > canvas.width - edgeBuffer) {
+        edgeWeightX = (head.x - (canvas.width - edgeBuffer)) / edgeBuffer;
       }
       
-      return { x: targetX, y: targetY };
+      if (head.y < edgeBuffer) {
+        edgeWeightY = (edgeBuffer - head.y) / edgeBuffer;
+      } else if (head.y > canvas.height - edgeBuffer) {
+        edgeWeightY = (head.y - (canvas.height - edgeBuffer)) / edgeBuffer;
+      }
+      
+      // تطبيق الأوزان
+      let adjustedX = targetX;
+      let adjustedY = targetY;
+      
+      if (distToFood < 200) {
+        const foodWeight = assistLevel * (1 - distToFood / 200);
+        adjustedX = targetX * (1 - foodWeight) + food.x * foodWeight;
+        adjustedY = targetY * (1 - foodWeight) + food.y * foodWeight;
+      }
+      
+      // تجنب الحواف
+      if (edgeWeightX > 0) {
+        adjustedX = adjustedX * (1 - edgeWeightX) + (canvas.width / 2) * edgeWeightX;
+      }
+      
+      if (edgeWeightY > 0) {
+        adjustedY = adjustedY * (1 - edgeWeightY) + (canvas.height / 2) * edgeWeightY;
+      }
+      
+      return { x: adjustedX, y: adjustedY };
     }
 
     // حلقة الرسم الرئيسية
@@ -767,7 +829,11 @@
           let x = predictions[0].landmarks[8][0] * (canvas.width / video.videoWidth);
           let y = predictions[0].landmarks[8][1] * (canvas.height / video.videoHeight);
           
-          const assistedTarget = applyAIAssist(x, y);
+          // تطبيق التنعيم على الحركة
+          smoothX = smoothX * smoothFactor + x * (1 - smoothFactor);
+          smoothY = smoothY * smoothFactor + y * (1 - smoothFactor);
+          
+          const assistedTarget = applyAIAssist(smoothX, smoothY);
           x = assistedTarget.x;
           y = assistedTarget.y;
           
@@ -777,6 +843,8 @@
           
           lastHandPosition = { x, y };
           handDetected = true;
+          handDetectionCount++;
+          handLostCount = 0;
           
           snake.push({x, y});
           if (snake.length > maxLength) snake.shift();
@@ -800,6 +868,12 @@
         } else {
           handIndicator.style.display = 'none';
           handDetected = false;
+          handLostCount++;
+          
+          // إذا فقدنا اليد لفترة طويلة، نوقف اللعبة
+          if (handLostCount > 30 && handDetectionCount > 10) {
+            endGame();
+          }
         }
       }
       
@@ -882,6 +956,7 @@
       finalLength.textContent = `طول الثعبان: ${maxLength}`;
       gameOverScreen.style.display = "flex";
       handIndicator.style.display = 'none';
+      controlTip.style.display = 'none';
       if (gameTimer) clearInterval(gameTimer);
     }
 
