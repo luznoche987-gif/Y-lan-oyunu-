@@ -8,126 +8,702 @@
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/handpose"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl"></script>
   <style>
+    :root {
+      --primary-color: #00ff00;
+      --secondary-color: #ff0000;
+      --background-color: #101010;
+      --text-color: #ffffff;
+      --accent-color: #ffcc00;
+    }
+    
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
     body {
       margin: 0;
       overflow: hidden;
-      background: radial-gradient(circle, #101010, #000);
-      color: white;
-      font-family: "Cairo", sans-serif;
+      background: radial-gradient(circle, var(--background-color), #000);
+      color: var(--text-color);
+      font-family: "Cairo", Arial, sans-serif;
       text-align: center;
       height: 100vh;
+      touch-action: none;
     }
-    h1 {
+    
+    #game-container {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+    }
+    
+    #start-screen, #game-over-screen {
       position: absolute;
-      top: 5px;
-      left: 50%;
-      transform: translateX(-50%);
-      font-size: 18px;
-      z-index: 5;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      background: rgba(0, 0, 0, 0.85);
+      z-index: 10;
+      padding: 20px;
     }
+    
+    #game-over-screen {
+      display: none;
+    }
+    
+    h1 {
+      font-size: 2.5rem;
+      margin-bottom: 20px;
+      color: var(--primary-color);
+      text-shadow: 0 0 10px var(--primary-color);
+    }
+    
+    h2 {
+      font-size: 2rem;
+      margin-bottom: 20px;
+      color: var(--accent-color);
+    }
+    
+    p {
+      font-size: 1.2rem;
+      margin-bottom: 15px;
+      max-width: 90%;
+      line-height: 1.5;
+    }
+    
+    .btn {
+      background: var(--primary-color);
+      color: #000;
+      border: none;
+      padding: 12px 30px;
+      font-size: 1.2rem;
+      border-radius: 50px;
+      cursor: pointer;
+      margin-top: 20px;
+      font-weight: bold;
+      transition: all 0.3s;
+      box-shadow: 0 0 15px var(--primary-color);
+    }
+    
+    .btn:hover {
+      background: var(--accent-color);
+      transform: scale(1.05);
+    }
+    
     #canvas {
       position: absolute;
       top: 0;
       left: 0;
       width: 100vw;
       height: 100vh;
+      z-index: 2;
     }
-    video {
+    
+    #video {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      object-fit: cover;
+      z-index: 1;
+      transform: scaleX(-1); /* مرآة للكاميرا */
+      filter: brightness(0.7) contrast(1.2);
+    }
+    
+    #camera-view {
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      width: 200px;
+      height: 150px;
+      border: 3px solid var(--primary-color);
+      border-radius: 10px;
+      overflow: hidden;
+      z-index: 5;
+      box-shadow: 0 0 15px rgba(0, 255, 0, 0.5);
+    }
+    
+    #camera-view video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transform: scaleX(-1); /* مرآة للكاميرا */
+    }
+    
+    #score-display {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      font-size: 1.5rem;
+      z-index: 5;
+      background: rgba(0, 0, 0, 0.7);
+      padding: 10px 15px;
+      border-radius: 10px;
+      border: 2px solid var(--primary-color);
+    }
+    
+    #instructions {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 1rem;
+      z-index: 5;
+      background: rgba(0, 0, 0, 0.7);
+      padding: 10px 15px;
+      border-radius: 10px;
+      max-width: 90%;
+      border: 2px solid var(--accent-color);
+    }
+    
+    #loading {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 1.5rem;
+      z-index: 15;
+      background: rgba(0, 0, 0, 0.8);
+      padding: 20px;
+      border-radius: 10px;
+    }
+    
+    .particle {
+      position: absolute;
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 3;
+    }
+    
+    .hand-indicator {
+      position: absolute;
+      width: 30px;
+      height: 30px;
+      background: rgba(255, 255, 255, 0.8);
+      border-radius: 50%;
+      z-index: 4;
+      pointer-events: none;
       display: none;
+      box-shadow: 0 0 10px var(--primary-color);
+    }
+    
+    #ai-assist {
+      position: absolute;
+      top: 80px;
+      left: 20px;
+      font-size: 1rem;
+      z-index: 5;
+      background: rgba(0, 0, 0, 0.7);
+      padding: 10px 15px;
+      border-radius: 10px;
+      border: 2px solid var(--accent-color);
+      max-width: 250px;
     }
   </style>
 </head>
 <body>
-  <h1>🐍 لعبة الثعبان باليد 🍎</h1>
-  <video id="video" autoplay playsinline></video>
-  <canvas id="canvas"></canvas>
+  <div id="game-container">
+    <div id="loading">جاري تحميل النموذج...</div>
+    
+    <div id="start-screen">
+      <h1>🐍 لعبة الثعبان باليد 🍎</h1>
+      <p>استخدم إصبع السبابة للتحكم في الثعبان وتناول التفاح!</p>
+      <p>اللعبة تستخدم الذكاء الاصطناعي لتسهيل التحكم</p>
+      <p>حاول تجنب الاصطدام بنفسك!</p>
+      <button id="start-btn" class="btn">ابدأ اللعب</button>
+    </div>
+    
+    <div id="game-over-screen">
+      <h2>انتهت اللعبة!</h2>
+      <p id="final-score">النقاط: 0</p>
+      <button id="restart-btn" class="btn">العب مرة أخرى</button>
+    </div>
+    
+    <div id="score-display">النقاط: 0</div>
+    <div id="ai-assist">المساعدة الذكية: نشطة</div>
+    <div id="instructions">حرك إصبعك للتحكم في الثعبان</div>
+    
+    <div id="camera-view">
+      <video id="camera-preview" autoplay playsinline></video>
+    </div>
+    
+    <video id="video" autoplay playsinline></video>
+    <canvas id="canvas"></canvas>
+    
+    <div class="hand-indicator" id="hand-indicator"></div>
+  </div>
 
   <script>
+    // عناصر DOM
     const video = document.getElementById("video");
+    const cameraPreview = document.getElementById("camera-preview");
     const canvas = document.getElementById("canvas");
     const ctx = canvas.getContext("2d");
+    const startScreen = document.getElementById("start-screen");
+    const gameOverScreen = document.getElementById("game-over-screen");
+    const startBtn = document.getElementById("start-btn");
+    const restartBtn = document.getElementById("restart-btn");
+    const scoreDisplay = document.getElementById("score-display");
+    const finalScore = document.getElementById("final-score");
+    const loading = document.getElementById("loading");
+    const instructions = document.getElementById("instructions");
+    const handIndicator = document.getElementById("hand-indicator");
+    const aiAssistDisplay = document.getElementById("ai-assist");
 
+    // متغيرات اللعبة
     let model;
-    let snake = [{x: 160, y: 240}];
-    let food = {x: Math.random()*300+20, y: Math.random()*400+20};
+    let snake = [];
+    let food = {};
     let maxLength = 50;
     let score = 0;
+    let gameActive = false;
+    let lastPredictionTime = 0;
+    let predictionInterval = 80; // تحديث أسرع لتجربة أفضل
+    let particles = [];
+    let lastHandPosition = { x: 0, y: 0 };
+    let handDetected = false;
+    let aiAssistActive = true;
+    let assistLevel = 0.7; // مستوى المساعدة (0-1)
 
+    // تهيئة اللعبة
+    function initGame() {
+      snake = [{x: canvas.width/2, y: canvas.height/2}];
+      randomFood();
+      maxLength = 50;
+      score = 0;
+      updateScore();
+      gameActive = true;
+      handDetected = false;
+      aiAssistActive = true;
+      assistLevel = 0.7;
+      updateAIAssistDisplay();
+    }
+
+    // ضبط حجم canvas
     function resizeCanvas() {
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
+      if (gameActive) {
+        // إعادة تعيين موقع الثعبان والطعام إذا تغير حجم الشاشة
+        snake[0] = {x: canvas.width/2, y: canvas.height/2};
+        randomFood();
+      }
     }
-    resizeCanvas();
-    window.addEventListener("resize", resizeCanvas);
-
+    
+    // إعداد الكاميرا
     async function setupCamera() {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "user" } // الكاميرا الأمامية
-      });
-      video.srcObject = stream;
-      return new Promise(resolve => {
-        video.onloadedmetadata = () => resolve(video);
-      });
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { 
+            facingMode: "user",
+            width: { ideal: 640 },
+            height: { ideal: 480 }
+          } 
+        });
+        video.srcObject = stream;
+        cameraPreview.srcObject = stream;
+        return new Promise(resolve => {
+          video.onloadedmetadata = () => {
+            video.width = video.videoWidth;
+            video.height = video.videoHeight;
+            resolve(video);
+          };
+        });
+      } catch (error) {
+        console.error("خطأ في الوصول للكاميرا:", error);
+        alert("تعذر الوصول للكاميرا. يرجى التأكد من السماح باستخدام الكاميرا وتحديث الصفحة.");
+        return null;
+      }
     }
 
+    // الدالة الرئيسية
     async function main() {
-      await setupCamera();
-      video.play();
-      model = await handpose.load();
-      drawLoop();
+      loading.style.display = "block";
+      
+      try {
+        // إعداد TensorFlow.js
+        await tf.setBackend('webgl');
+        
+        // تحميل نموذج handpose
+        model = await handpose.load();
+        
+        // إعداد الكاميرا
+        const cameraReady = await setupCamera();
+        if (!cameraReady) return;
+        
+        loading.style.display = "none";
+        startScreen.style.display = "flex";
+      } catch (error) {
+        console.error("خطأ في التحميل:", error);
+        loading.textContent = "حدث خطأ في التحميل. يرجى تحديث الصفحة.";
+      }
     }
 
+    // توليد طعام عشوائي
     function randomFood() {
       food = {
-        x: Math.random() * canvas.width * 0.9 + 20,
-        y: Math.random() * canvas.height * 0.9 + 20
+        x: Math.random() * (canvas.width - 60) + 30,
+        y: Math.random() * (canvas.height - 60) + 30
       };
     }
 
-    async function drawLoop() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // تحديث النقاط
+    function updateScore() {
+      scoreDisplay.textContent = `النقاط: ${score}`;
+    }
+    
+    // تحديث عرض المساعدة الذكية
+    function updateAIAssistDisplay() {
+      aiAssistDisplay.textContent = `المساعدة الذكية: ${aiAssistActive ? 'نشطة' : 'غير نشطة'}`;
+    }
 
-      const predictions = await model.estimateHands(video);
-      if (predictions.length > 0) {
-        const x = canvas.width - predictions[0].landmarks[8][0]; // معكوس للمرايا
-        const y = predictions[0].landmarks[8][1];
-        snake.push({x, y});
-        if (snake.length > maxLength) snake.shift();
+    // إنشاء تأثيرات جسيمات
+    function createParticles(x, y, color, count = 10) {
+      for (let i = 0; i < count; i++) {
+        particles.push({
+          x: x,
+          y: y,
+          color: color,
+          size: Math.random() * 5 + 2,
+          speedX: (Math.random() - 0.5) * 10,
+          speedY: (Math.random() - 0.5) * 10,
+          life: 1.0
+        });
+      }
+    }
 
-        const dx = x - food.x;
-        const dy = y - food.y;
-        const dist = Math.sqrt(dx*dx + dy*dy);
-        if (dist < 30) {
-          randomFood();
-          maxLength += 5;
-          score++;
+    // تحديث ورسم الجسيمات
+    function updateParticles() {
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.x += p.speedX;
+        p.y += p.speedY;
+        p.life -= 0.02;
+        
+        if (p.life <= 0) {
+          particles.splice(i, 1);
+        } else {
+          ctx.globalAlpha = p.life;
+          ctx.fillStyle = p.color;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+          ctx.fill();
         }
       }
+      ctx.globalAlpha = 1.0;
+    }
 
+    // التحقق من الاصطدام
+    function checkCollision() {
+      const head = snake[snake.length - 1];
+      
+      // التحقق من الاصطدام بالجدران
+      if (head.x < 0 || head.x > canvas.width || head.y < 0 || head.y > canvas.height) {
+        return true;
+      }
+      
+      // التحقق من الاصطدام بالنفس (بدءاً من العنصر الرابع لتجنب الاصطدام بالعناصر القريبة)
+      for (let i = 0; i < snake.length - 10; i++) {
+        const dx = head.x - snake[i].x;
+        const dy = head.y - snake[i].y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        
+        if (dist < 15) {
+          return true;
+        }
+      }
+      
+      return false;
+    }
+    
+    // المساعدة الذكية - جعل اللعبة أسهل
+    function applyAIAssist(targetX, targetY) {
+      if (!aiAssistActive) return { x: targetX, y: targetY };
+      
+      const head = snake[snake.length - 1];
+      
+      // إذا كان الهدف قريباً من الطعام، توجيه نحو الطعام
+      const dxToFood = food.x - head.x;
+      const dyToFood = food.y - head.y;
+      const distToFood = Math.sqrt(dxToFood * dxToFood + dyToFood * dyToFood);
+      
+      if (distToFood < 200) {
+        // توجيه جزئي نحو الطعام
+        const foodWeight = assistLevel * (1 - distToFood / 200);
+        targetX = targetX * (1 - foodWeight) + food.x * foodWeight;
+        targetY = targetY * (1 - foodWeight) + food.y * foodWeight;
+      }
+      
+      // تجنب الاصطدام بالنفس
+      for (let i = 0; i < snake.length - 5; i++) {
+        const dxToBody = head.x - snake[i].x;
+        const dyToBody = head.y - snake[i].y;
+        const distToBody = Math.sqrt(dxToBody * dxToBody + dyToBody * dyToBody);
+        
+        if (distToBody < 50) {
+          // تجنب الجزء من الجسم
+          const avoidWeight = assistLevel * (1 - distToBody / 50);
+          targetX = targetX + (dxToBody / distToBody) * 30 * avoidWeight;
+          targetY = targetY + (dyToBody / distToBody) * 30 * avoidWeight;
+        }
+      }
+      
+      // تجنب الجدران
+      const wallMargin = 50;
+      if (head.x < wallMargin) {
+        targetX = Math.max(targetX, head.x + 10);
+      } else if (head.x > canvas.width - wallMargin) {
+        targetX = Math.min(targetX, head.x - 10);
+      }
+      
+      if (head.y < wallMargin) {
+        targetY = Math.max(targetY, head.y + 10);
+      } else if (head.y > canvas.height - wallMargin) {
+        targetY = Math.min(targetY, head.y - 10);
+      }
+      
+      return { x: targetX, y: targetY };
+    }
+
+    // حلقة الرسم الرئيسية
+    async function drawLoop() {
+      if (!gameActive) return;
+      
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      // تحديث التنبؤات بفاصل زمني لتقليل الحمل
+      const currentTime = Date.now();
+      if (currentTime - lastPredictionTime > predictionInterval) {
+        lastPredictionTime = currentTime;
+        
+        const predictions = await model.estimateHands(video);
+        if (predictions.length > 0) {
+          let x = canvas.width - predictions[0].landmarks[8][0] * (canvas.width / video.videoWidth);
+          let y = predictions[0].landmarks[8][1] * (canvas.height / video.videoHeight);
+          
+          // تطبيق المساعدة الذكية
+          const assistedTarget = applyAIAssist(x, y);
+          x = assistedTarget.x;
+          y = assistedTarget.y;
+          
+          // تحديث مؤشر اليد
+          handIndicator.style.display = 'block';
+          handIndicator.style.left = (x - 15) + 'px';
+          handIndicator.style.top = (y - 15) + 'px';
+          
+          // تسجيل آخر موقع للتحقق من استمرار الكشف
+          lastHandPosition = { x, y };
+          handDetected = true;
+          
+          // إضافة نقطة جديدة للثعبان
+          snake.push({x, y});
+          if (snake.length > maxLength) snake.shift();
+          
+          // التحقق من أكل الطعام
+          const dx = x - food.x;
+          const dy = y - food.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          
+          if (dist < 30) {
+            createParticles(food.x, food.y, '#ff0000', 15);
+            randomFood();
+            maxLength += 5;
+            score++;
+            updateScore();
+            
+            // تقليل مستوى المساعدة تدريجياً مع زيادة النقاط
+            if (score % 5 === 0 && assistLevel > 0.2) {
+              assistLevel -= 0.1;
+            }
+            
+            // إضافة تأثير صوتي (محاكاة)
+            try {
+              const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+              const oscillator = audioContext.createOscillator();
+              const gainNode = audioContext.createGain();
+              
+              oscillator.connect(gainNode);
+              gainNode.connect(audioContext.destination);
+              
+              oscillator.frequency.value = 800;
+              gainNode.gain.value = 0.1;
+              
+              oscillator.start();
+              gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.2);
+              oscillator.stop(audioContext.currentTime + 0.2);
+            } catch (e) {
+              console.log("تعذر تشغيل الصوت");
+            }
+          }
+          
+          // التحقق من الاصطدام
+          if (checkCollision()) {
+            gameOver();
+            return;
+          }
+        } else {
+          // إخفاء مؤشر اليد إذا لم يتم الكشف عن يد
+          handIndicator.style.display = 'none';
+          handDetected = false;
+          
+          // إذا لم يتم الكشف عن اليد، استمر في الحركة في الاتجاه الأخير
+          if (handDetected && snake.length > 1) {
+            const lastSegment = snake[snake.length - 1];
+            const secondLastSegment = snake[snake.length - 2];
+            const dx = lastSegment.x - secondLastSegment.x;
+            const dy = lastSegment.y - secondLastSegment.y;
+            
+            snake.push({
+              x: lastSegment.x + dx * 0.5,
+              y: lastSegment.y + dy * 0.5
+            });
+            
+            if (snake.length > maxLength) snake.shift();
+            
+            // التحقق من الاصطدام
+            if (checkCollision()) {
+              gameOver();
+              return;
+            }
+          }
+        }
+      }
+      
       // رسم الثعبان
       ctx.beginPath();
       for (let i = 1; i < snake.length; i++) {
+        const gradient = ctx.createLinearGradient(
+          snake[i-1].x, snake[i-1].y, 
+          snake[i].x, snake[i].y
+        );
+        gradient.addColorStop(0, '#00ff00');
+        gradient.addColorStop(1, '#00cc00');
+        
+        ctx.strokeStyle = gradient;
+        ctx.lineWidth = 8;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        
         ctx.moveTo(snake[i-1].x, snake[i-1].y);
         ctx.lineTo(snake[i].x, snake[i].y);
+        ctx.stroke();
       }
-      ctx.strokeStyle = "lime";
-      ctx.lineWidth = 8;
-      ctx.stroke();
-
-      // رسم التفاحة 🍎
+      
+      // رسم رأس الثعبان
+      if (snake.length > 0) {
+        const head = snake[snake.length - 1];
+        ctx.beginPath();
+        ctx.arc(head.x, head.y, 10, 0, Math.PI * 2);
+        ctx.fillStyle = '#00ff00';
+        ctx.fill();
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        
+        // رسم العينين
+        ctx.beginPath();
+        ctx.arc(head.x - 4, head.y - 4, 3, 0, Math.PI * 2);
+        ctx.arc(head.x + 4, head.y - 4, 3, 0, Math.PI * 2);
+        ctx.fillStyle = '#000';
+        ctx.fill();
+      }
+      
+      // رسم التفاحة
       ctx.beginPath();
       ctx.arc(food.x, food.y, 20, 0, Math.PI * 2);
-      ctx.fillStyle = "red";
+      
+      // تدرج لوني للتفاحة
+      const gradient = ctx.createRadialGradient(
+        food.x - 5, food.y - 5, 5,
+        food.x, food.y, 20
+      );
+      gradient.addColorStop(0, '#ff3333');
+      gradient.addColorStop(1, '#cc0000');
+      
+      ctx.fillStyle = gradient;
       ctx.fill();
-
-      // النقاط
-      ctx.font = "24px Arial";
-      ctx.fillStyle = "#fff";
-      ctx.fillText("النقاط: " + score, 20, 40);
-
+      
+      // ساق التفاحة
+      ctx.beginPath();
+      ctx.moveTo(food.x, food.y - 20);
+      ctx.lineTo(food.x, food.y - 30);
+      ctx.strokeStyle = '#8B4513';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+      
+      // ورقة التفاحة
+      ctx.beginPath();
+      ctx.arc(food.x + 5, food.y - 25, 8, 0, Math.PI * 1.5);
+      ctx.fillStyle = '#00cc00';
+      ctx.fill();
+      
+      // تحديث ورسم الجسيمات
+      updateParticles();
+      
       requestAnimationFrame(drawLoop);
     }
 
+    // نهاية اللعبة
+    function gameOver() {
+      gameActive = false;
+      finalScore.textContent = `النقاط: ${score}`;
+      gameOverScreen.style.display = "flex";
+      handIndicator.style.display = 'none';
+      
+      // تأثير صوتي لنهاية اللعبة
+      try {
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        
+        oscillator.frequency.value = 200;
+        gainNode.gain.value = 0.1;
+        
+        oscillator.start();
+        gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.5);
+        oscillator.stop(audioContext.currentTime + 0.5);
+      } catch (e) {
+        console.log("تعذر تشغيل الصوت");
+      }
+    }
+
+    // مستمعي الأحداث
+    startBtn.addEventListener("click", () => {
+      startScreen.style.display = "none";
+      resizeCanvas();
+      initGame();
+      drawLoop();
+    });
+
+    restartBtn.addEventListener("click", () => {
+      gameOverScreen.style.display = "none";
+      initGame();
+      drawLoop();
+    });
+
+    // تبديل المساعدة الذكية بالضغط على المسافة
+    document.addEventListener('keydown', (e) => {
+      if (e.code === 'Space' && gameActive) {
+        aiAssistActive = !aiAssistActive;
+        updateAIAssistDisplay();
+      }
+    });
+
+    window.addEventListener("resize", resizeCanvas);
+
+    // بدء التطبيق
     main();
   </script>
 </body>
