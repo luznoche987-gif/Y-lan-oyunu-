@@ -57,7 +57,7 @@
       overflow: hidden;
     }
     
-    #start-screen, #game-over-screen {
+    #start-screen, #game-over-screen, #project-info {
       position: absolute;
       top: 0;
       left: 0;
@@ -67,12 +67,12 @@
       flex-direction: column;
       justify-content: center;
       align-items: center;
-      background: rgba(0, 0, 0, 0.9);
+      background: rgba(0, 0, 0, 0.95);
       z-index: 20;
       padding: 20px;
     }
     
-    #game-over-screen {
+    #game-over-screen, #project-info {
       display: none;
     }
     
@@ -87,6 +87,12 @@
       font-size: 2rem;
       margin-bottom: 20px;
       color: var(--accent-color);
+    }
+    
+    h3 {
+      font-size: 1.5rem;
+      margin: 15px 0;
+      color: var(--primary-color);
     }
     
     p {
@@ -113,6 +119,17 @@
     .btn:hover {
       background: var(--accent-color);
       transform: scale(1.05);
+    }
+    
+    .btn-secondary {
+      background: transparent;
+      color: var(--primary-color);
+      border: 2px solid var(--primary-color);
+    }
+    
+    .btn-secondary:hover {
+      background: var(--primary-color);
+      color: #000;
     }
     
     #canvas {
@@ -253,6 +270,35 @@
       border: 2px solid var(--accent-color);
     }
 
+    #length-display {
+      position: absolute;
+      top: 140px;
+      left: 20px;
+      font-size: 1rem;
+      z-index: 5;
+      background: rgba(0, 0, 0, 0.7);
+      padding: 10px 15px;
+      border-radius: 10px;
+      border: 2px solid var(--primary-color);
+    }
+
+    .project-details {
+      background: rgba(0, 0, 0, 0.7);
+      padding: 20px;
+      border-radius: 15px;
+      border: 2px solid var(--accent-color);
+      max-width: 90%;
+      margin: 10px 0;
+    }
+
+    .developer-info {
+      background: rgba(0, 100, 0, 0.3);
+      padding: 15px;
+      border-radius: 10px;
+      border: 1px solid var(--primary-color);
+      margin: 10px 0;
+    }
+
     /* تصميم متجاوب للشاشات الصغيرة */
     @media (max-width: 768px) {
       #game-container {
@@ -277,6 +323,10 @@
         font-size: 1.5rem;
       }
       
+      h3 {
+        font-size: 1.2rem;
+      }
+      
       p {
         font-size: 1rem;
       }
@@ -298,13 +348,42 @@
       <p>اللعبة <strong>بدون اصطدام</strong> - استمتع باللعب بحرية!</p>
       <p>حاول جمع أكبر عدد من النقاط!</p>
       <button id="start-btn" class="btn">ابدأ اللعب</button>
+      <button id="info-btn" class="btn btn-secondary">معلومات المشروع</button>
+    </div>
+    
+    <div id="project-info">
+      <h1>معلومات المشروع</h1>
+      
+      <div class="project-details">
+        <h3>وصف المشروع:</h3>
+        <p>لعبة الثعبان التقليدية بتقنية التحكم باليد باستخدام الذكاء الاصطناعي. 
+           تستخدم اللعبة نموذج Handpose من TensorFlow.js للكشف عن حركة اليد 
+           والتحكم في الثعبان باستخدام إصبع السبابة.</p>
+        
+        <h3>المميزات:</h3>
+        <p>• التحكم بالثعبان باستخدام حركة اليد</p>
+        <p>• نظام مساعدة ذكية لتسهيل اللعب</p>
+        <p>• رسومات جميلة وتأثيرات بصرية</p>
+        <p>• واجهة مستخدم باللغة العربية</p>
+        <p>• تصميم متجاوب يعمل على جميع الأجهزة</p>
+      </div>
+      
+      <div class="developer-info">
+        <h3>المطور:</h3>
+        <p>عبد الوهاب عبد الواحد الريمي</p>
+        <p>مطور ويب وتطبيقات تفاعلية</p>
+      </div>
+      
+      <button id="back-btn" class="btn">العودة</button>
     </div>
     
     <div id="game-over-screen">
       <h2>انتهت الجولة!</h2>
       <p id="final-score">النقاط: 0</p>
       <p id="final-time">الوقت: 0 ثانية</p>
+      <p id="final-length">طول الثعبان: 0</p>
       <button id="restart-btn" class="btn">العب مرة أخرى</button>
+      <button id="menu-btn" class="btn btn-secondary">القائمة الرئيسية</button>
     </div>
     
     <!-- قسم الكاميرا -->
@@ -321,6 +400,7 @@
       <canvas id="canvas"></canvas>
       <div id="score-display">النقاط: 0</div>
       <div id="time-display">الوقت: 0 ث</div>
+      <div id="length-display">الطول: 50</div>
       <div id="ai-assist">المساعدة الذكية: نشطة</div>
       <div id="instructions">حرك إصبعك للتحكم في الثعبان - لا يوجد اصطدام!</div>
     </div>
@@ -335,12 +415,18 @@
     const handCtx = handCanvas.getContext("2d");
     const startScreen = document.getElementById("start-screen");
     const gameOverScreen = document.getElementById("game-over-screen");
+    const projectInfo = document.getElementById("project-info");
     const startBtn = document.getElementById("start-btn");
     const restartBtn = document.getElementById("restart-btn");
+    const infoBtn = document.getElementById("info-btn");
+    const backBtn = document.getElementById("back-btn");
+    const menuBtn = document.getElementById("menu-btn");
     const scoreDisplay = document.getElementById("score-display");
     const timeDisplay = document.getElementById("time-display");
+    const lengthDisplay = document.getElementById("length-display");
     const finalScore = document.getElementById("final-score");
     const finalTime = document.getElementById("final-time");
+    const finalLength = document.getElementById("final-length");
     const loading = document.getElementById("loading");
     const instructions = document.getElementById("instructions");
     const handIndicator = document.getElementById("hand-indicator");
@@ -363,6 +449,7 @@
     let startTime = 0;
     let gameTime = 0;
     let gameTimer = null;
+    const GROWTH_RATE = 5; // الثعبان يطول 5 بكسل عند أكل التفاحة
 
     // تهيئة اللعبة
     function initGame() {
@@ -373,6 +460,7 @@
       gameTime = 0;
       updateScore();
       updateTime();
+      updateLength();
       gameActive = true;
       handDetected = false;
       aiAssistActive = true;
@@ -395,6 +483,10 @@
 
     function updateTime() {
       timeDisplay.textContent = `الوقت: ${gameTime} ث`;
+    }
+
+    function updateLength() {
+      lengthDisplay.textContent = `الطول: ${maxLength}`;
     }
 
     // ضبط حجم canvas
@@ -662,9 +754,10 @@
           if (dist < 30) {
             createParticles(food.x, food.y, '#ff0000', 15);
             randomFood();
-            maxLength += 5;
+            maxLength += GROWTH_RATE; // زيادة الطول بمقدار 5 بكسل
             score++;
             updateScore();
+            updateLength();
             
             if (score % 5 === 0 && assistLevel > 0.2) {
               assistLevel -= 0.1;
@@ -747,11 +840,12 @@
       requestAnimationFrame(drawLoop);
     }
 
-    // إنهاء اللعبة يدويًا (يمكن إضافة زر إنهاء)
+    // إنهاء اللعبة يدويًا
     function endGame() {
       gameActive = false;
       finalScore.textContent = `النقاط: ${score}`;
       finalTime.textContent = `الوقت: ${gameTime} ثانية`;
+      finalLength.textContent = `طول الثعبان: ${maxLength}`;
       gameOverScreen.style.display = "flex";
       handIndicator.style.display = 'none';
       if (gameTimer) clearInterval(gameTimer);
@@ -769,6 +863,21 @@
       gameOverScreen.style.display = "none";
       initGame();
       drawLoop();
+    });
+
+    infoBtn.addEventListener("click", () => {
+      startScreen.style.display = "none";
+      projectInfo.style.display = "flex";
+    });
+
+    backBtn.addEventListener("click", () => {
+      projectInfo.style.display = "none";
+      startScreen.style.display = "flex";
+    });
+
+    menuBtn.addEventListener("click", () => {
+      gameOverScreen.style.display = "none";
+      startScreen.style.display = "flex";
     });
 
     // إضافة زر إنهاء اللعبة يدويًا بالضغط على ESC
