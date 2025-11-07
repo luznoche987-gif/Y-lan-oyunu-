@@ -289,6 +289,8 @@
       border: 2px solid var(--accent-color);
       max-width: 90%;
       margin: 10px 0;
+      max-height: 60vh;
+      overflow-y: auto;
     }
 
     .developer-info {
@@ -297,6 +299,16 @@
       border-radius: 10px;
       border: 1px solid var(--primary-color);
       margin: 10px 0;
+    }
+    
+    .hand-lines {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 4;
+      pointer-events: none;
     }
 
     /* تصميم متجاوب للشاشات الصغيرة */
@@ -335,6 +347,11 @@
         padding: 10px 25px;
         font-size: 1rem;
       }
+      
+      #score-display, #time-display, #length-display, #ai-assist {
+        font-size: 0.9rem;
+        padding: 8px 12px;
+      }
     }
   </style>
 </head>
@@ -366,6 +383,14 @@
         <p>• رسومات جميلة وتأثيرات بصرية</p>
         <p>• واجهة مستخدم باللغة العربية</p>
         <p>• تصميم متجاوب يعمل على جميع الأجهزة</p>
+        <p>• خيوط ذكية تظهر فوق اليد للتحكم</p>
+        
+        <h3>كيفية اللعب:</h3>
+        <p>• استخدم إصبع السبابة للتحكم في حركة الثعبان</p>
+        <p>• حرك إصبعك لتوجيه الثعبان نحو التفاحة</p>
+        <p>• كلما التقطت تفاحة، يزداد طول الثعبان وتحصل على نقاط</p>
+        <p>• اضغط على زر المسافة (Space) لتفعيل/إلغاء المساعدة الذكية</p>
+        <p>• اضغط على زر الهروب (ESC) لإنهاء اللعبة</p>
       </div>
       
       <div class="developer-info">
@@ -375,6 +400,7 @@
       </div>
       
       <button id="back-btn" class="btn">العودة</button>
+      <button id="exit-btn" class="btn btn-secondary">خروج</button>
     </div>
     
     <div id="game-over-screen">
@@ -391,6 +417,7 @@
       <div id="camera-label">كاميرا التحكم</div>
       <video id="video" autoplay playsinline></video>
       <canvas id="hand-canvas"></canvas>
+      <canvas id="hand-lines" class="hand-lines"></canvas>
       <div class="hand-indicator" id="hand-indicator"></div>
     </div>
     
@@ -411,8 +438,10 @@
     const video = document.getElementById("video");
     const canvas = document.getElementById("canvas");
     const handCanvas = document.getElementById("hand-canvas");
+    const handLinesCanvas = document.getElementById("hand-lines");
     const ctx = canvas.getContext("2d");
     const handCtx = handCanvas.getContext("2d");
+    const handLinesCtx = handLinesCanvas.getContext("2d");
     const startScreen = document.getElementById("start-screen");
     const gameOverScreen = document.getElementById("game-over-screen");
     const projectInfo = document.getElementById("project-info");
@@ -421,6 +450,7 @@
     const infoBtn = document.getElementById("info-btn");
     const backBtn = document.getElementById("back-btn");
     const menuBtn = document.getElementById("menu-btn");
+    const exitBtn = document.getElementById("exit-btn");
     const scoreDisplay = document.getElementById("score-display");
     const timeDisplay = document.getElementById("time-display");
     const lengthDisplay = document.getElementById("length-display");
@@ -499,6 +529,9 @@
       
       handCanvas.width = cameraSection.clientWidth;
       handCanvas.height = cameraSection.clientHeight;
+      
+      handLinesCanvas.width = cameraSection.clientWidth;
+      handLinesCanvas.height = cameraSection.clientHeight;
       
       if (gameActive) {
         snake[0] = {x: canvas.width/2, y: canvas.height/2};
@@ -624,11 +657,12 @@
     // رسم خيوط الذكاء الاصطناعي على اليد
     function drawAIHandLines(predictions) {
       handCtx.clearRect(0, 0, handCanvas.width, handCanvas.height);
+      handLinesCtx.clearRect(0, 0, handLinesCanvas.width, handLinesCanvas.height);
       
       if (predictions.length > 0) {
         const landmarks = predictions[0].landmarks;
         
-        // رسم نقاط اليد
+        // رسم نقاط اليد على canvas منفصل
         for (let i = 0; i < landmarks.length; i++) {
           const x = landmarks[i][0] * (handCanvas.width / video.videoWidth);
           const y = landmarks[i][1] * (handCanvas.height / video.videoHeight);
@@ -639,7 +673,7 @@
           handCtx.fill();
         }
         
-        // رسم خطوط توصيل بين النقاط
+        // رسم خطوط توصيل بين النقاط على canvas الخيوط (فوق اليد)
         const connections = [
           [0, 1], [1, 2], [2, 3], [3, 4],
           [0, 5], [5, 6], [6, 7], [7, 8],
@@ -648,51 +682,51 @@
           [0, 17], [17, 18], [18, 19], [19, 20]
         ];
         
-        handCtx.strokeStyle = '#ff00ff';
-        handCtx.lineWidth = 2;
+        handLinesCtx.strokeStyle = '#ff00ff';
+        handLinesCtx.lineWidth = 2;
         
         for (let i = 0; i < connections.length; i++) {
           const start = connections[i][0];
           const end = connections[i][1];
           
-          const startX = landmarks[start][0] * (handCanvas.width / video.videoWidth);
-          const startY = landmarks[start][1] * (handCanvas.height / video.videoHeight);
-          const endX = landmarks[end][0] * (handCanvas.width / video.videoWidth);
-          const endY = landmarks[end][1] * (handCanvas.height / video.videoHeight);
+          const startX = landmarks[start][0] * (handLinesCanvas.width / video.videoWidth);
+          const startY = landmarks[start][1] * (handLinesCanvas.height / video.videoHeight);
+          const endX = landmarks[end][0] * (handLinesCanvas.width / video.videoWidth);
+          const endY = landmarks[end][1] * (handLinesCanvas.height / video.videoHeight);
           
-          handCtx.beginPath();
-          handCtx.moveTo(startX, startY);
-          handCtx.lineTo(endX, endY);
-          handCtx.stroke();
+          handLinesCtx.beginPath();
+          handLinesCtx.moveTo(startX, startY);
+          handLinesCtx.lineTo(endX, endY);
+          handLinesCtx.stroke();
         }
         
-        // تمييز إصبع السبابة
+        // تمييز إصبع السبابة على canvas الخيوط
         const indexFingerTip = landmarks[8];
         const indexFingerBase = landmarks[5];
         
-        const tipX = indexFingerTip[0] * (handCanvas.width / video.videoWidth);
-        const tipY = indexFingerTip[1] * (handCanvas.height / video.videoHeight);
-        const baseX = indexFingerBase[0] * (handCanvas.width / video.videoWidth);
-        const baseY = indexFingerBase[1] * (handCanvas.height / video.videoHeight);
+        const tipX = indexFingerTip[0] * (handLinesCanvas.width / video.videoWidth);
+        const tipY = indexFingerTip[1] * (handLinesCanvas.height / video.videoHeight);
+        const baseX = indexFingerBase[0] * (handLinesCanvas.width / video.videoWidth);
+        const baseY = indexFingerBase[1] * (handLinesCanvas.height / video.videoHeight);
         
-        handCtx.strokeStyle = '#ffff00';
-        handCtx.lineWidth = 3;
-        handCtx.beginPath();
-        handCtx.moveTo(baseX, baseY);
-        handCtx.lineTo(tipX, tipY);
-        handCtx.stroke();
+        handLinesCtx.strokeStyle = '#ffff00';
+        handLinesCtx.lineWidth = 3;
+        handLinesCtx.beginPath();
+        handLinesCtx.moveTo(baseX, baseY);
+        handLinesCtx.lineTo(tipX, tipY);
+        handLinesCtx.stroke();
         
-        // رسم دائرة حول إصبع السبابة
-        handCtx.beginPath();
-        handCtx.arc(tipX, tipY, 15, 0, 2 * Math.PI);
-        handCtx.strokeStyle = '#ffff00';
-        handCtx.lineWidth = 2;
-        handCtx.stroke();
+        // رسم دائرة حول إصبع السبابة على canvas الخيوط
+        handLinesCtx.beginPath();
+        handLinesCtx.arc(tipX, tipY, 15, 0, 2 * Math.PI);
+        handLinesCtx.strokeStyle = '#ffff00';
+        handLinesCtx.lineWidth = 2;
+        handLinesCtx.stroke();
         
-        // إضافة نص توضيحي
-        handCtx.fillStyle = '#ffffff';
-        handCtx.font = '16px Arial';
-        handCtx.fillText('إصبع التحكم', tipX - 40, tipY - 20);
+        // إضافة نص توضيحي على canvas الخيوط
+        handLinesCtx.fillStyle = '#ffffff';
+        handLinesCtx.font = '16px Arial';
+        handLinesCtx.fillText('إصبع التحكم', tipX - 40, tipY - 20);
       }
     }
 
@@ -880,6 +914,11 @@
       startScreen.style.display = "flex";
     });
 
+    exitBtn.addEventListener("click", () => {
+      projectInfo.style.display = "none";
+      startScreen.style.display = "flex";
+    });
+
     // إضافة زر إنهاء اللعبة يدويًا بالضغط على ESC
     document.addEventListener('keydown', (e) => {
       if (e.code === 'Space' && gameActive) {
@@ -890,6 +929,14 @@
         endGame();
       }
     });
+
+    // إضافة مستمعي أحداث للهواتف
+    document.addEventListener('touchstart', (e) => {
+      if (gameActive) {
+        // منع التمرير على الهواتف
+        e.preventDefault();
+      }
+    }, { passive: false });
 
     window.addEventListener("resize", resizeCanvas);
 
