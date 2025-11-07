@@ -1,824 +1,934 @@
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
+<html lang="ar">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>لعبة الثعبان بالذكاء الاصطناعي - الهاتف</title>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            -webkit-tap-highlight-color: transparent;
-        }
-        
-        body {
-            font-family: 'Arial', sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            direction: rtl;
-            overflow-x: hidden;
-            touch-action: manipulation;
-        }
-        
-        .container {
-            max-width: 100%;
-            padding: 10px;
-        }
-        
-        .header {
-            text-align: center;
-            padding: 10px;
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 15px;
-            margin-bottom: 10px;
-            backdrop-filter: blur(10px);
-        }
-        
-        h1 {
-            font-size: 1.5rem;
-            margin-bottom: 5px;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
-        }
-        
-        .stats {
-            display: flex;
-            justify-content: space-around;
-            background: rgba(255, 255, 255, 0.15);
-            padding: 10px;
-            border-radius: 10px;
-            margin: 10px 0;
-            font-size: 0.9rem;
-        }
-        
-        .main-content {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-        
-        .game-area {
-            position: relative;
-            width: 100%;
-            height: 50vh;
-            border: 3px solid #fff;
-            border-radius: 15px;
-            overflow: hidden;
-            background: #000;
-        }
-        
-        #gameCanvas {
-            width: 100%;
-            height: 100%;
-            display: block;
-        }
-        
-        .camera-area {
-            position: relative;
-            width: 100%;
-            height: 30vh;
-            border: 2px solid #fff;
-            border-radius: 15px;
-            overflow: hidden;
-            background: #000;
-        }
-        
-        #webcam {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            transform: scaleX(-1);
-        }
-        
-        #outputCanvas {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-        }
-        
-        .camera-overlay {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            background: rgba(0, 0, 0, 0.7);
-            color: white;
-            padding: 8px 12px;
-            border-radius: 10px;
-            font-size: 0.8rem;
-            z-index: 10;
-        }
-        
-        .hand-point {
-            position: absolute;
-            width: 20px;
-            height: 20px;
-            background: #ff00ff;
-            border: 2px solid white;
-            border-radius: 50%;
-            pointer-events: none;
-            z-index: 100;
-            display: none;
-            box-shadow: 0 0 10px rgba(255, 0, 255, 0.8);
-        }
-        
-        .controls {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-            margin: 10px 0;
-        }
-        
-        button {
-            background: #4CAF50;
-            color: white;
-            border: none;
-            padding: 15px;
-            border-radius: 25px;
-            font-size: 1rem;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            touch-action: manipulation;
-            font-weight: bold;
-        }
-        
-        button:active {
-            transform: scale(0.95);
-        }
-        
-        #startBtn { 
-            background: linear-gradient(135deg, #2196F3, #1976D2);
-        }
-        
-        #resetBtn { 
-            background: linear-gradient(135deg, #ff9800, #f57c00);
-        }
-        
-        #cameraBtn { 
-            background: linear-gradient(135deg, #9C27B0, #7B1FA2);
-        }
-        
-        .instructions {
-            background: rgba(255, 255, 255, 0.15);
-            padding: 15px;
-            border-radius: 10px;
-            margin: 10px 0;
-            font-size: 0.9rem;
-            line-height: 1.5;
-        }
-        
-        .loading {
-            text-align: center;
-            padding: 10px;
-            color: #ffeb3b;
-            font-size: 1rem;
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 10px;
-            margin: 10px 0;
-        }
-        
-        .status-indicators {
-            display: flex;
-            justify-content: space-between;
-            margin: 10px 0;
-        }
-        
-        .status {
-            background: rgba(255, 255, 255, 0.2);
-            padding: 8px 15px;
-            border-radius: 20px;
-            font-size: 0.8rem;
-            display: flex;
-            align-items: center;
-            gap: 5px;
-        }
-        
-        .status.game { background: rgba(76, 175, 80, 0.3); }
-        .status.camera { background: rgba(156, 39, 176, 0.3); }
-        .status.hand { background: rgba(255, 0, 255, 0.3); }
-        
-        /* تحسينات للشاشات الصغيرة */
-        @media (max-width: 768px) {
-            .header h1 {
-                font-size: 1.3rem;
-            }
-            
-            .stats {
-                font-size: 0.8rem;
-            }
-            
-            button {
-                padding: 12px;
-                font-size: 0.9rem;
-            }
-            
-            .instructions {
-                font-size: 0.8rem;
-            }
-            
-            .game-area {
-                height: 45vh;
-            }
-            
-            .camera-area {
-                height: 25vh;
-            }
-        }
-        
-        @media (max-width: 480px) {
-            .container {
-                padding: 5px;
-            }
-            
-            .header h1 {
-                font-size: 1.1rem;
-            }
-            
-            .game-area {
-                height: 40vh;
-            }
-            
-            .camera-area {
-                height: 22vh;
-            }
-            
-            .status-indicators {
-                flex-direction: column;
-                gap: 5px;
-            }
-        }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>🐍 لعبة الثعبان باليد 🍎 - مجاني</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/handpose"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
 
-        @media (min-width: 1024px) {
-            .main-content {
-                flex-direction: row;
-                height: 60vh;
-            }
-            
-            .game-area {
-                height: 100%;
-                flex: 2;
-            }
-            
-            .camera-area {
-                height: 100%;
-                flex: 1;
-            }
-        }
-
-        /* تأثيرات للكشف عن اليد */
-        @keyframes pulse {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.2); }
-            100% { transform: scale(1); }
-        }
-        
-        .hand-detected {
-            animation: pulse 1s infinite;
-        }
-    </style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: #000;
+      color: white;
+      font-family: "Cairo", sans-serif;
+      text-align: center;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      touch-action: none;
+    }
+    
+    #game-container {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      margin: 0 auto;
+      overflow: hidden;
+    }
+    
+    #camera-canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    
+    #game-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 2;
+    }
+    
+    #score {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      font-size: 24px;
+      z-index: 5;
+      background: rgba(0, 0, 0, 0.7);
+      color: lime;
+      padding: 10px 20px;
+      border-radius: 20px;
+      pointer-events: none;
+    }
+    
+    #instructions {
+      position: absolute;
+      bottom: 20px;
+      left: 0;
+      width: 100%;
+      text-align: center;
+      font-size: 18px;
+      color: white;
+      background: rgba(0, 0, 0, 0.7);
+      padding: 10px;
+      z-index: 5;
+      pointer-events: none;
+    }
+    
+    #controls {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      z-index: 5;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      pointer-events: auto;
+    }
+    
+    .control-btn {
+      background: rgba(0, 0, 0, 0.7);
+      color: white;
+      border: 2px solid lime;
+      padding: 10px 15px;
+      border-radius: 20px;
+      font-size: 14px;
+      cursor: pointer;
+      font-family: "Cairo", sans-serif;
+      transition: all 0.3s;
+    }
+    
+    .control-btn:hover {
+      background: rgba(0, 255, 0, 0.2);
+      transform: translateY(-2px);
+    }
+    
+    .control-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+    
+    #overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0, 0, 0, 0.9);
+      z-index: 10;
+    }
+    
+    #start-screen, #game-over-screen, #permission-screen {
+      text-align: center;
+      padding: 30px;
+      max-width: 90%;
+      background: rgba(0, 0, 0, 0.8);
+      border-radius: 20px;
+      border: 2px solid lime;
+      box-shadow: 0 0 30px rgba(0, 255, 0, 0.5);
+    }
+    
+    h1 {
+      font-size: 36px;
+      margin-bottom: 20px;
+      color: lime;
+      text-shadow: 0 0 15px rgba(0, 255, 0, 0.7);
+    }
+    
+    h2 {
+      font-size: 28px;
+      margin-bottom: 20px;
+      color: #ffcc00;
+    }
+    
+    p {
+      font-size: 18px;
+      margin-bottom: 20px;
+      line-height: 1.6;
+    }
+    
+    .error-message {
+      color: #ff6b6b;
+      background: rgba(255, 0, 0, 0.1);
+      padding: 15px;
+      border-radius: 10px;
+      margin: 15px 0;
+      border: 1px solid #ff6b6b;
+    }
+    
+    .troubleshoot-list {
+      text-align: right;
+      margin: 15px 0;
+      padding-right: 20px;
+    }
+    
+    .troubleshoot-list li {
+      margin-bottom: 10px;
+    }
+    
+    button {
+      background: linear-gradient(to bottom, #4CAF50, #2E7D32);
+      color: white;
+      border: none;
+      padding: 15px 30px;
+      font-size: 20px;
+      border-radius: 30px;
+      cursor: pointer;
+      font-family: "Cairo", sans-serif;
+      margin: 15px 10px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+      transition: all 0.3s;
+      pointer-events: auto;
+    }
+    
+    button:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+      background: linear-gradient(to bottom, #5CB860, #3E8E41);
+    }
+    
+    button:disabled {
+      background: #666;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+    
+    #loading {
+      font-size: 20px;
+      margin-top: 20px;
+      color: #aaa;
+    }
+    
+    .particle {
+      position: absolute;
+      pointer-events: none;
+      border-radius: 50%;
+      opacity: 0.7;
+      z-index: 3;
+    }
+    
+    video {
+      display: none;
+    }
+    
+    .permission-icon {
+      font-size: 60px;
+      margin-bottom: 20px;
+    }
+    
+    #hand-indicator {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 80px;
+      opacity: 0.7;
+      z-index: 2;
+      color: rgba(255, 255, 255, 0.5);
+    }
+    
+    .game-title {
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 28px;
+      z-index: 5;
+      background: rgba(0, 0, 0, 0.7);
+      color: lime;
+      padding: 10px 25px;
+      border-radius: 20px;
+      pointer-events: none;
+      border: 1px solid lime;
+    }
+    
+    /* حقوق المطور */
+    #developer-info {
+      position: absolute;
+      bottom: 10px;
+      right: 10px;
+      z-index: 5;
+      background: rgba(0, 0, 0, 0.7);
+      color: #aaa;
+      padding: 8px 15px;
+      border-radius: 15px;
+      font-size: 14px;
+      pointer-events: none;
+      text-align: center;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+    
+    #developer-name {
+      color: lime;
+      font-weight: bold;
+      margin-bottom: 2px;
+    }
+    
+    #free-badge {
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      margin-top: 70px;
+      background: linear-gradient(45deg, #4CAF50, #2E7D32);
+      color: white;
+      padding: 5px 15px;
+      border-radius: 15px;
+      font-size: 14px;
+      z-index: 5;
+      pointer-events: none;
+      border: 1px solid lime;
+      box-shadow: 0 0 10px rgba(76, 175, 80, 0.5);
+    }
+    
+    .developer-section {
+      margin: 20px 0;
+      padding: 15px;
+      background: rgba(0, 255, 0, 0.1);
+      border-radius: 10px;
+      border: 1px solid rgba(0, 255, 0, 0.3);
+    }
+    
+    .developer-section h3 {
+      color: lime;
+      margin-bottom: 10px;
+    }
+    
+    /* تحسينات للهواتف */
+    @media (max-width: 768px) {
+      .game-title {
+        font-size: 20px;
+        padding: 8px 15px;
+      }
+      
+      #score {
+        font-size: 18px;
+        padding: 8px 15px;
+      }
+      
+      #controls {
+        top: 10px;
+        right: 10px;
+        gap: 5px;
+      }
+      
+      .control-btn {
+        padding: 8px 12px;
+        font-size: 12px;
+      }
+      
+      #instructions {
+        font-size: 16px;
+        padding: 8px;
+      }
+      
+      #start-screen, #game-over-screen, #permission-screen {
+        padding: 20px;
+      }
+      
+      h1 {
+        font-size: 28px;
+      }
+      
+      h2 {
+        font-size: 24px;
+      }
+      
+      p {
+        font-size: 16px;
+      }
+      
+      button {
+        padding: 12px 25px;
+        font-size: 18px;
+      }
+      
+      #free-badge {
+        font-size: 12px;
+        padding: 4px 10px;
+      }
+      
+      #developer-info {
+        font-size: 12px;
+        padding: 6px 12px;
+      }
+    }
+    
+    /* تحسينات إضافية للهواتف الصغيرة */
+    @media (max-width: 480px) {
+      .game-title {
+        font-size: 18px;
+        padding: 6px 12px;
+      }
+      
+      #score {
+        font-size: 16px;
+        padding: 6px 12px;
+      }
+      
+      .control-btn {
+        padding: 6px 10px;
+        font-size: 11px;
+      }
+      
+      #instructions {
+        font-size: 14px;
+      }
+      
+      h1 {
+        font-size: 24px;
+      }
+      
+      h2 {
+        font-size: 20px;
+      }
+      
+      button {
+        padding: 10px 20px;
+        font-size: 16px;
+      }
+    }
+  </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>🐍 لعبة الثعبان بالذكاء الاصطناعي</h1>
-            <div class="stats">
-                <div>الطول: <span id="length">0</span></div>
-                <div>النتيجة: <span id="score">0</span></div>
-                <div>الطعام: <span id="foodCount">10</span></div>
-            </div>
-        </div>
-        
-        <div class="status-indicators">
-            <div class="status game" id="gameStatus">⏹️ اللعبة متوقفة</div>
-            <div class="status camera" id="cameraStatus">🔴 الكاميرا متوقفة</div>
-            <div class="status hand" id="handStatus">✋ انتظر الكاميرا</div>
-        </div>
-        
-        <div class="main-content">
-            <div class="game-area">
-                <canvas id="gameCanvas"></canvas>
-            </div>
-            
-            <div class="camera-area">
-                <video id="webcam" autoplay playsinline></video>
-                <canvas id="outputCanvas"></canvas>
-                <div class="camera-overlay">كاميرا تتبع اليد</div>
-                <div class="hand-point" id="handPoint"></div>
-            </div>
-        </div>
-        
-        <div class="controls">
-            <button id="startBtn">🎮 بدء اللعبة</button>
-            <button id="resetBtn">🔄 إعادة البدء</button>
-            <button id="cameraBtn">📷 تشغيل الكاميرا</button>
-        </div>
-        
-        <div class="instructions">
-            <h3>🎯 طريقة اللعب:</h3>
-            <p>• اضغط "تشغيل الكاميرا" واسمح بالوصول إلى الكاميرا</p>
-            <p>• اضغط "بدء اللعبة" ثم حرك إصبع السبابة أمام الكاميرا</p>
-            <p>• 🍎 كل دائرة حمراء = 10 نقاط</p>
-            <p>• ⚠️ تجنب لمس حواف الشاشة!</p>
-        </div>
-        
-        <div class="loading" id="loadingText">
-            ⏳ جاري تحميل نموذج تتبع اليد...
-        </div>
+  <div id="game-container">
+    <canvas id="camera-canvas"></canvas>
+    
+    <div id="game-overlay">
+      <div class="game-title">🐍 لعبة الثعبان باليد 🍎</div>
+      <div id="free-badge">🆓 مجاني بالكامل</div>
+      <div id="score">النقاط: 0</div>
+      <div id="instructions">حرك إصبع السبابة للتحكم بالثعبان وجمع التفاح الأحمر</div>
+      
+      <div id="controls">
+        <button class="control-btn" id="camera-switch">تبديل الكاميرا</button>
+        <button class="control-btn" id="manual-mode-btn">التحكم اليدوي</button>
+      </div>
+      
+      <div id="hand-indicator">✋</div>
+      
+      <!-- حقوق المطور -->
+      <div id="developer-info">
+        <div id="developer-name">عبد الوهاب عبد الواحد الريمي</div>
+        <div>مطور اللعبة</div>
+      </div>
     </div>
+    
+    <div id="overlay">
+      <div id="start-screen">
+        <h2>🐍 لعبة الثعبان بالتحكم باليد 🍎</h2>
+        <div class="developer-section">
+          <h3>🆓 لعبة مجانية بالكامل</h3>
+          <p>تم التطوير بدعم وتفانٍ لتقديم تجربة لعب ممتعة للجميع</p>
+        </div>
+        <p>استخدم إصبع السبابة للتحكم بحركة الثعبان وجمع التفاح الأحمر!</p>
+        <p>يمكنك التبديل بين التحكم بالكاميرا والتحكم اليدوي باللمس</p>
+        
+        <div class="developer-section">
+          <h3>👨‍💻 المطور</h3>
+          <p><strong>عبد الوهاب عبد الواحد الريمي</strong></p>
+          <p>مطور ألعاب وتطبيقات تفاعلية</p>
+        </div>
+        
+        <button id="start-button">🚀 ابدأ اللعبة مجاناً</button>
+        <div id="loading">جاري تحميل نموذج التعرف على اليد...</div>
+      </div>
+      
+      <div id="game-over-screen" style="display: none;">
+        <h2>انتهت اللعبة!</h2>
+        <p id="final-score">نقاطك النهائية: 0</p>
+        
+        <div class="developer-section">
+          <h3>شكراً للعب! 🎮</h3>
+          <p>لعبة مجانية مقدمة من <strong>عبد الوهاب عبد الواحد الريمي</strong></p>
+        </div>
+        
+        <button id="restart-button">🔄 العب مرة أخرى مجاناً</button>
+      </div>
+      
+      <div id="permission-screen" style="display: none;">
+        <div class="permission-icon">📷</div>
+        <h2>مشكلة في الوصول للكاميرا</h2>
+        <div class="error-message" id="error-details">
+          تعذر على الموقع الإلكتروني هذا طلب الإذن
+        </div>
+        <p>لحل المشكلة، يرجى اتباع الخطوات التالية:</p>
+        <ul class="troubleshoot-list">
+          <li>أغلق جميع التطبيقات الأخرى التي قد تستخدم الكاميرا</li>
+          <li>أغلق جميع النوافذ المنبثقة في المتصفح</li>
+          <li>تأكد من السماح للموقع باستخدام الكاميرا</li>
+          <li>أعد تحميل الصفحة وحاول مرة أخرى</li>
+        </ul>
+        
+        <div class="developer-section">
+          <p>لعبة مجانية من تطوير <strong>عبد الوهاب عبد الواحد الريمي</strong></p>
+        </div>
+        
+        <button id="retry-button">إعادة المحاولة</button>
+        <button id="manual-mode-button">اللعب بدون كاميرا</button>
+      </div>
+    </div>
+  </div>
 
-    <script>
-        class SnakeGame {
-            constructor() {
-                this.canvas = document.getElementById('gameCanvas');
-                this.ctx = this.canvas.getContext('2d');
-                this.video = document.getElementById('webcam');
-                this.outputCanvas = document.getElementById('outputCanvas');
-                this.outputCtx = this.outputCanvas.getContext('2d');
-                this.handPoint = document.getElementById('handPoint');
-                
-                // عناصر الواجهة
-                this.gameStatus = document.getElementById('gameStatus');
-                this.cameraStatus = document.getElementById('cameraStatus');
-                this.handStatus = document.getElementById('handStatus');
-                this.loadingText = document.getElementById('loadingText');
-                
-                // ضبط حجم Canvas
-                this.setupCanvasSize();
-                
-                // متغيرات اللعبة
-                this.points = [];
-                this.lengths = [];
-                this.currentLength = 0;
-                this.allowedLength = 250;
-                this.previousHead = { x: this.canvas.width / 2, y: this.canvas.height / 2 };
-                this.score = 0;
-                this.foodCount = 10;
-                this.gameRunning = false;
-                this.cameraActive = false;
-                this.handDetector = null;
-                this.camera = null;
-                this.lastHandTime = 0;
-                this.handDetectionActive = false;
-                
-                this.food = {
-                    x: 0,
-                    y: 0,
-                    size: 20
-                };
-                
-                this.randomFoodLocation();
-                this.setupEventListeners();
-                this.setupHandDetection();
-                
-                // بدء التحديث التلقائي
-                this.gameLoop();
-            }
-            
-            setupCanvasSize() {
-                // حجم لعبة الثعبان
-                const gameRect = this.canvas.parentElement.getBoundingClientRect();
-                this.canvas.width = gameRect.width;
-                this.canvas.height = gameRect.height;
-                
-                // حجم كاميرا تتبع اليد
-                const cameraRect = this.outputCanvas.parentElement.getBoundingClientRect();
-                this.outputCanvas.width = cameraRect.width;
-                this.outputCanvas.height = cameraRect.height;
-            }
-            
-            setupEventListeners() {
-                document.getElementById('startBtn').addEventListener('click', () => this.startGame());
-                document.getElementById('resetBtn').addEventListener('click', () => this.resetGame());
-                document.getElementById('cameraBtn').addEventListener('click', () => this.toggleCamera());
-                
-                // إعادة ضبط الحجم
-                window.addEventListener('resize', () => {
-                    setTimeout(() => {
-                        this.setupCanvasSize();
-                        this.draw();
-                    }, 100);
-                });
-                
-                // تحكم باللمس (بديل)
-                this.canvas.addEventListener('touchmove', (e) => {
-                    if (this.gameRunning && (!this.cameraActive || !this.handDetectionActive)) {
-                        e.preventDefault();
-                        const rect = this.canvas.getBoundingClientRect();
-                        const touch = e.touches[0];
-                        this.update({
-                            x: touch.clientX - rect.left,
-                            y: touch.clientY - rect.top
-                        });
-                    }
-                }, { passive: false });
-            }
-            
-            async setupHandDetection() {
-                try {
-                    this.loadingText.innerHTML = '⏳ جاري تحميل نموذج تتبع اليد...';
-                    
-                    this.handDetector = new Hands({
-                        locateFile: (file) => {
-                            return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
-                        }
-                    });
-                    
-                    this.handDetector.setOptions({
-                        maxNumHands: 1,
-                        modelComplexity: 1,
-                        minDetectionConfidence: 0.7,
-                        minTrackingConfidence: 0.7
-                    });
-                    
-                    this.handDetector.onResults((results) => {
-                        this.onHandResults(results);
-                    });
-                    
-                    this.loadingText.innerHTML = '✅ النموذج جاهز! اضغط "تشغيل الكاميرا"';
-                    
-                } catch (error) {
-                    console.error('Error setting up hand detection:', error);
-                    this.loadingText.innerHTML = '⚠️ يمكنك استخدام اللمس للتحكم في اللعبة';
-                }
-            }
-            
-            onHandResults(results) {
-                this.outputCtx.save();
-                this.outputCtx.clearRect(0, 0, this.outputCanvas.width, this.outputCanvas.height);
-                
-                // رسم فيديو الكاميرا
-                this.outputCtx.drawImage(results.image, 0, 0, this.outputCanvas.width, this.outputCanvas.height);
-                
-                if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-                    const landmarks = results.multiHandLandmarks[0];
-                    
-                    // رسم نقاط اليد
-                    drawConnectors(this.outputCtx, landmarks, HAND_CONNECTIONS, {
-                        color: '#00FF00',
-                        lineWidth: 3
-                    });
-                    drawLandmarks(this.outputCtx, landmarks, {
-                        color: '#FF0000',
-                        lineWidth: 2,
-                        radius: 4
-                    });
-                    
-                    // تحديث وقت اكتشاف اليد الأخير
-                    this.lastHandTime = Date.now();
-                    this.handDetectionActive = true;
-                    this.handStatus.innerHTML = '✅ يد مكتشفة - حرك إصبعك!';
-                    this.handStatus.style.background = 'rgba(76, 175, 80, 0.3)';
-                    
-                    // الحصول على موضع إصبع السبابة (Landmark 8)
-                    const indexFinger = landmarks[8];
-                    if (indexFinger) {
-                        const x = indexFinger.x * this.outputCanvas.width;
-                        const y = indexFinger.y * this.outputCanvas.height;
-                        
-                        // تحديث موضع النقطة المرئية
-                        this.handPoint.style.display = 'block';
-                        this.handPoint.style.left = (x - 10) + 'px';
-                        this.handPoint.style.top = (y - 10) + 'px';
-                        this.handPoint.classList.add('hand-detected');
-                        
-                        // تحويل إحداثيات الكاميرا إلى إحداثيات اللعبة
-                        if (this.gameRunning && this.cameraActive) {
-                            const gameX = (x / this.outputCanvas.width) * this.canvas.width;
-                            const gameY = (y / this.outputCanvas.height) * this.canvas.height;
-                            this.update({ 
-                                x: Math.max(15, Math.min(this.canvas.width - 15, gameX)),
-                                y: Math.max(15, Math.min(this.canvas.height - 15, gameY))
-                            });
-                        }
-                    }
-                } else {
-                    this.handDetectionActive = false;
-                    this.handPoint.style.display = 'none';
-                    this.handPoint.classList.remove('hand-detected');
-                    this.handStatus.innerHTML = '✋ ضع يدك أمام الكاميرا';
-                    this.handStatus.style.background = 'rgba(255, 0, 255, 0.3)';
-                }
-                
-                this.outputCtx.restore();
-            }
-            
-            async toggleCamera() {
-                if (!this.cameraActive) {
-                    await this.startCamera();
-                } else {
-                    this.stopCamera();
-                }
-            }
-            
-            async startCamera() {
-                try {
-                    this.loadingText.innerHTML = '📷 جاري تشغيل الكاميرا...';
-                    
-                    const stream = await navigator.mediaDevices.getUserMedia({
-                        video: {
-                            facingMode: 'user',
-                            width: { ideal: 640 },
-                            height: { ideal: 480 },
-                            frameRate: { ideal: 30 }
-                        }
-                    });
-                    
-                    this.video.srcObject = stream;
-                    this.cameraActive = true;
-                    this.cameraStatus.innerHTML = "✅ الكاميرا نشطة";
-                    this.cameraStatus.style.background = "rgba(76, 175, 80, 0.3)";
-                    document.getElementById('cameraBtn').innerHTML = '📷 إيقاف الكاميرا';
-                    this.loadingText.innerHTML = '🎯 الكاميرا تعمل - حرك إصبعك أمام الكاميرا!';
-                    
-                    // بدء التتبع
-                    this.camera = new Camera(this.video, {
-                        onFrame: async () => {
-                            if (this.handDetector && this.cameraActive) {
-                                await this.handDetector.send({ image: this.video });
-                            }
-                        },
-                        width: this.outputCanvas.width,
-                        height: this.outputCanvas.height
-                    });
-                    await this.camera.start();
-                    
-                } catch (error) {
-                    console.error('Error starting camera:', error);
-                    this.loadingText.innerHTML = '❌ خطأ في تشغيل الكاميرا. تأكد من السماح بالوصول إلى الكاميرا.';
-                    this.cameraActive = false;
-                }
-            }
-            
-            stopCamera() {
-                if (this.camera) {
-                    this.camera.stop();
-                    this.camera = null;
-                }
-                
-                if (this.video.srcObject) {
-                    this.video.srcObject.getTracks().forEach(track => track.stop());
-                    this.video.srcObject = null;
-                }
-                
-                this.cameraActive = false;
-                this.handDetectionActive = false;
-                this.cameraStatus.innerHTML = "🔴 الكاميرا متوقفة";
-                this.cameraStatus.style.background = "rgba(244, 67, 54, 0.3)";
-                this.handStatus.innerHTML = "✋ انتظر الكاميرا";
-                this.handStatus.style.background = "rgba(255, 0, 255, 0.3)";
-                document.getElementById('cameraBtn').innerHTML = '📷 تشغيل الكاميرا';
-                this.handPoint.style.display = 'none';
-                this.loadingText.innerHTML = '💡 اضغط "تشغيل الكاميرا" للبدء';
-                
-                // مسح canvas الكاميرا
-                this.outputCtx.clearRect(0, 0, this.outputCanvas.width, this.outputCanvas.height);
-            }
-            
-            randomFoodLocation() {
-                this.food.x = Math.random() * (this.canvas.width - 60) + 30;
-                this.food.y = Math.random() * (this.canvas.height - 60) + 30;
-            }
-            
-            startGame() {
-                this.gameRunning = true;
-                this.points = [{ x: this.canvas.width / 2, y: this.canvas.height / 2 }];
-                this.lengths = [];
-                this.currentLength = 0;
-                this.score = 0;
-                this.foodCount = 10;
-                this.previousHead = { x: this.canvas.width / 2, y: this.canvas.height / 2 };
-                this.updateStats();
-                this.gameStatus.innerHTML = "🎮 اللعبة تعمل";
-                this.gameStatus.style.background = "rgba(76, 175, 80, 0.3)";
-            }
-            
-            resetGame() {
-                this.gameRunning = false;
-                this.points = [];
-                this.score = 0;
-                this.foodCount = 10;
-                this.updateStats();
-                this.gameStatus.innerHTML = "⏹️ اللعبة متوقفة";
-                this.gameStatus.style.background = "rgba(76, 175, 80, 0.3)";
-            }
-            
-            updateStats() {
-                document.getElementById('length').textContent = Math.floor(this.currentLength);
-                document.getElementById('score').textContent = this.score;
-                document.getElementById('foodCount').textContent = this.foodCount;
-            }
-            
-            update(currentHead) {
-                if (!this.gameRunning) return;
-                
-                const px = this.previousHead.x;
-                const py = this.previousHead.y;
-                const cx = currentHead.x;
-                const cy = currentHead.y;
-                
-                this.points.push({ x: cx, y: cy });
-                const distance = Math.hypot(cx - px, cy - py);
-                this.lengths.push(distance);
-                this.currentLength += distance;
-                this.previousHead = { x: cx, y: cy };
-                
-                // تقليل طول الثعبان
-                if (this.currentLength > this.allowedLength) {
-                    for (let i = 0; i < this.lengths.length; i++) {
-                        this.currentLength -= this.lengths[i];
-                        this.lengths.splice(i, 1);
-                        this.points.splice(i, 1);
-                        if (this.currentLength < this.allowedLength) break;
-                    }
-                }
-                
-                // التحقق من أكل الطعام
-                if (Math.abs(cx - this.food.x) < this.food.size + 10 && 
-                    Math.abs(cy - this.food.y) < this.food.size + 10) {
-                    this.randomFoodLocation();
-                    this.allowedLength += 25;
-                    this.score += 10;
-                    this.foodCount--;
-                    this.updateStats();
-                    
-                    if (this.foodCount <= 0) {
-                        this.gameWon();
-                    }
-                }
-                
-                // التحقق من الاصطدام بالجدران
-                if (cx < 5 || cx > this.canvas.width - 5 || cy < 5 || cy > this.canvas.height - 5) {
-                    this.gameOver();
-                }
-            }
-            
-            draw() {
-                // مسح Canvas
-                this.ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
-                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-                
-                // رسم شبكة خلفية
-                this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
-                this.ctx.lineWidth = 1;
-                const size = 30;
-                for (let x = 0; x < this.canvas.width; x += size) {
-                    this.ctx.beginPath();
-                    this.ctx.moveTo(x, 0);
-                    this.ctx.lineTo(x, this.canvas.height);
-                    this.ctx.stroke();
-                }
-                for (let y = 0; y < this.canvas.height; y += size) {
-                    this.ctx.beginPath();
-                    this.ctx.moveTo(0, y);
-                    this.ctx.lineTo(this.canvas.width, y);
-                    this.ctx.stroke();
-                }
-                
-                // رسم الثعبان
-                if (this.points.length > 0) {
-                    this.drawSnake();
-                }
-                
-                // رسم الطعام
-                this.drawFood();
-                
-                // رسم المعلومات
-                this.drawUI();
-            }
-            
-            drawSnake() {
-                // رسم خط الجسم
-                this.ctx.strokeStyle = '#00ff00';
-                this.ctx.lineWidth = 8;
-                this.ctx.lineCap = 'round';
-                this.ctx.lineJoin = 'round';
-                this.ctx.beginPath();
-                this.ctx.moveTo(this.points[0].x, this.points[0].y);
-                
-                for (let i = 1; i < this.points.length; i++) {
-                    this.ctx.lineTo(this.points[i].x, this.points[i].y);
-                }
-                this.ctx.stroke();
-                
-                // رسم الرأس
-                const head = this.points[this.points.length - 1];
-                const gradient = this.ctx.createRadialGradient(
-                    head.x, head.y, 5,
-                    head.x, head.y, 20
-                );
-                gradient.addColorStop(0, '#ff00ff');
-                gradient.addColorStop(1, '#9900cc');
-                
-                this.ctx.fillStyle = gradient;
-                this.ctx.beginPath();
-                this.ctx.arc(head.x, head.y, 15, 0, Math.PI * 2);
-                this.ctx.fill();
-                
-                // عيون الثعبان
-                this.ctx.fillStyle = 'white';
-                this.ctx.beginPath();
-                this.ctx.arc(head.x - 6, head.y - 6, 4, 0, Math.PI * 2);
-                this.ctx.arc(head.x + 6, head.y - 6, 4, 0, Math.PI * 2);
-                this.ctx.fill();
-                
-                this.ctx.fillStyle = 'black';
-                this.ctx.beginPath();
-                this.ctx.arc(head.x - 6, head.y - 6, 2, 0, Math.PI * 2);
-                this.ctx.arc(head.x + 6, head.y - 6, 2, 0, Math.PI * 2);
-                this.ctx.fill();
-            }
-            
-            drawFood() {
-                const gradient = this.ctx.createRadialGradient(
-                    this.food.x, this.food.y, 5,
-                    this.food.x, this.food.y, this.food.size
-                );
-                gradient.addColorStop(0, '#ff6b6b');
-                gradient.addColorStop(1, '#ee5a24');
-                
-                this.ctx.fillStyle = gradient;
-                this.ctx.beginPath();
-                this.ctx.arc(this.food.x, this.food.y, this.food.size, 0, Math.PI * 2);
-                this.ctx.fill();
-                
-                // تأثير بريق
-                this.ctx.strokeStyle = 'rgba(255, 255, 0, 0.6)';
-                this.ctx.lineWidth = 3;
-                this.ctx.beginPath();
-                this.ctx.arc(this.food.x, this.food.y, this.food.size + 5, 0, Math.PI * 2);
-                this.ctx.stroke();
-            }
-            
-            drawUI() {
-                // رسم النقاط
-                this.ctx.fillStyle = 'white';
-                this.ctx.font = 'bold 16px Arial';
-                this.ctx.textAlign = 'left';
-                this.ctx.fillText(`النقاط: ${this.score}`, 10, 25);
-                this.ctx.fillText(`الطعام: ${this.foodCount}`, 10, 50);
-                
-                // رسالة التحكم
-                if (!this.cameraActive) {
-                    this.ctx.textAlign = 'center';
-                    this.ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
-                    this.ctx.font = '14px Arial';
-                    this.ctx.fillText('شغّل الكاميرا أو استخدم اللمس للتحكم', this.canvas.width / 2, this.canvas.height - 20);
-                }
-            }
-            
-            gameLoop() {
-                this.draw();
-                requestAnimationFrame(() => this.gameLoop());
-            }
-            
-            gameOver() {
-                this.gameRunning = false;
-                this.ctx.fillStyle = 'rgba(255, 0, 0, 0.8)';
-                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-                
-                this.ctx.fillStyle = 'white';
-                this.ctx.font = 'bold 30px Arial';
-                this.ctx.textAlign = 'center';
-                this.ctx.fillText('انتهت اللعبة!', this.canvas.width / 2, this.canvas.height / 2 - 30);
-                this.ctx.font = '24px Arial';
-                this.ctx.fillText(`النتيجة: ${this.score}`, this.canvas.width / 2, this.canvas.height / 2 + 20);
-                
-                this.gameStatus.innerHTML = "💀 انتهت اللعبة";
-                this.gameStatus.style.background = "rgba(244, 67, 54, 0.3)";
-            }
-            
-            gameWon() {
-                this.gameRunning = false;
-                this.ctx.fillStyle = 'rgba(0, 255, 0, 0.8)';
-                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-                
-                this.ctx.fillStyle = 'white';
-                this.ctx.font = 'bold 30px Arial';
-                this.ctx.textAlign = 'center';
-                this.ctx.fillText('🎉 فزت في اللعبة!', this.canvas.width / 2, this.canvas.height / 2);
-                
-                this.gameStatus.innerHTML = "🏆 فزت في اللعبة!";
-                this.gameStatus.style.background = "rgba(255, 193, 7, 0.3)";
-            }
+  <video id="video" autoplay playsinline></video>
+
+  <script>
+    const video = document.getElementById("video");
+    const cameraCanvas = document.getElementById("camera-canvas");
+    const cameraCtx = cameraCanvas.getContext("2d");
+    const startButton = document.getElementById("start-button");
+    const restartButton = document.getElementById("restart-button");
+    const retryButton = document.getElementById("retry-button");
+    const manualModeButton = document.getElementById("manual-mode-button");
+    const manualModeBtn = document.getElementById("manual-mode-btn");
+    const startScreen = document.getElementById("start-screen");
+    const gameOverScreen = document.getElementById("game-over-screen");
+    const permissionScreen = document.getElementById("permission-screen");
+    const loadingElement = document.getElementById("loading");
+    const scoreElement = document.getElementById("score");
+    const finalScoreElement = document.getElementById("final-score");
+    const errorDetailsElement = document.getElementById("error-details");
+    const overlay = document.getElementById("overlay");
+    const cameraSwitch = document.getElementById("camera-switch");
+    const handIndicator = document.getElementById("hand-indicator");
+
+    let model;
+    let snake = [];
+    let food = {};
+    let maxLength = 50;
+    let score = 0;
+    let gameActive = false;
+    let lastPredictionTime = 0;
+    const predictionInterval = 100;
+    let currentFacingMode = "environment";
+    let cameraActive = false;
+    let manualMode = false;
+    let mouseX = 0, mouseY = 0;
+    let handDetected = false;
+
+    function resizeCanvas() {
+      cameraCanvas.width = window.innerWidth;
+      cameraCanvas.height = window.innerHeight;
+    }
+    
+    resizeCanvas();
+    window.addEventListener("resize", resizeCanvas);
+
+    async function setupCamera(facingMode) {
+      try {
+        // إيقاف الكاميرا الحالية إذا كانت تعمل
+        if (video.srcObject) {
+          video.srcObject.getTracks().forEach(track => track.stop());
         }
         
-        // بدء اللعبة عند تحميل الصفحة
-        window.addEventListener('load', () => {
-            new SnakeGame();
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { 
+            facingMode: facingMode,
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+          }
         });
         
-        // منع الإجراءات الافتراضية
-        document.addEventListener('touchmove', (e) => {
-            if (e.target.tagName !== 'BUTTON') {
-                e.preventDefault();
-            }
-        }, { passive: false });
-    </script>
+        video.srcObject = stream;
+        cameraActive = true;
+        
+        return new Promise(resolve => {
+          video.onloadedmetadata = () => resolve(video);
+        });
+      } catch (error) {
+        console.error("خطأ في الوصول للكاميرا:", error);
+        cameraActive = false;
+        showPermissionError(error);
+        return null;
+      }
+    }
+
+    function showPermissionError(error) {
+      startScreen.style.display = "none";
+      gameOverScreen.style.display = "none";
+      permissionScreen.style.display = "block";
+      
+      let errorMessage = "تعذر على الموقع الإلكتروني هذا طلب الإذن";
+      
+      if (error.name === "NotAllowedError") {
+        errorMessage = "تم رفض الإذن باستخدام الكاميرا. يرجى السماح للموقع باستخدام الكاميرا في إعدادات المتصفح.";
+      } else if (error.name === "NotFoundError") {
+        errorMessage = "لم يتم العثور على كاميرا. تأكد من توصيل الكاميرا بشكل صحيح.";
+      } else if (error.name === "NotReadableError") {
+        errorMessage = "الكاميرا قيد الاستخدام من قبل تطبيق آخر. يرجى إغلاق التطبيقات الأخرى التي تستخدم الكاميرا.";
+      }
+      
+      errorDetailsElement.textContent = errorMessage;
+    }
+
+    function enableManualMode() {
+      manualMode = true;
+      cameraActive = false;
+      permissionScreen.style.display = "none";
+      startScreen.style.display = "none";
+      gameOverScreen.style.display = "none";
+      overlay.style.display = "none";
+      cameraCanvas.style.background = "radial-gradient(circle, #101010, #000)";
+      initGame();
+      drawLoop();
+    }
+
+    function toggleManualMode() {
+      if (manualMode) {
+        // العودة إلى وضع الكاميرا
+        manualMode = false;
+        manualModeBtn.textContent = "التحكم اليدوي";
+        setupCamera(currentFacingMode).then(() => {
+          if (gameActive) {
+            video.play();
+          }
+        });
+      } else {
+        // التبديل إلى وضع اليدوي
+        manualMode = true;
+        cameraActive = false;
+        manualModeBtn.textContent = "التحكم بالكاميرا";
+        
+        // إيقاف الكاميرا
+        if (video.srcObject) {
+          video.srcObject.getTracks().forEach(track => track.stop());
+          video.srcObject = null;
+        }
+        
+        cameraCanvas.style.background = "radial-gradient(circle, #101010, #000)";
+      }
+    }
+
+    async function main() {
+      loadingElement.textContent = "جاري تحميل نموذج التعرف على اليد...";
+      
+      try {
+        await tf.setBackend('webgl');
+        model = await handpose.load();
+        loadingElement.textContent = "النموذج جاهز!";
+        startButton.disabled = false;
+      } catch (error) {
+        console.error("خطأ في تحميل النموذج:", error);
+        loadingElement.textContent = "خطأ في تحميل النموذج. تأكد من اتصال الإنترنت.";
+      }
+    }
+
+    function initGame() {
+      snake = [{x: cameraCanvas.width/2, y: cameraCanvas.height/2}];
+      randomFood();
+      maxLength = 50;
+      score = 0;
+      scoreElement.textContent = "النقاط: 0";
+      gameActive = true;
+      
+      if (!manualMode) {
+        overlay.style.display = "none";
+      }
+    }
+
+    function randomFood() {
+      food = {
+        x: Math.random() * (cameraCanvas.width - 100) + 50,
+        y: Math.random() * (cameraCanvas.height - 100) + 50
+      };
+    }
+
+    function createParticles(x, y, color, count) {
+      for (let i = 0; i < count; i++) {
+        const particle = document.createElement('div');
+        particle.className = 'particle';
+        particle.style.width = Math.random() * 15 + 8 + 'px';
+        particle.style.height = particle.style.width;
+        particle.style.backgroundColor = color;
+        particle.style.left = x + 'px';
+        particle.style.top = y + 'px';
+        
+        document.getElementById('game-container').appendChild(particle);
+        
+        const angle = Math.random() * Math.PI * 2;
+        const speed = Math.random() * 4 + 2;
+        const vx = Math.cos(angle) * speed;
+        const vy = Math.sin(angle) * speed;
+        
+        let opacity = 0.7;
+        const animate = () => {
+          opacity -= 0.02;
+          if (opacity <= 0) {
+            particle.remove();
+            return;
+          }
+          
+          particle.style.opacity = opacity;
+          particle.style.left = parseFloat(particle.style.left) + vx + 'px';
+          particle.style.top = parseFloat(particle.style.top) + vy + 'px';
+          
+          requestAnimationFrame(animate);
+        };
+        
+        animate();
+      }
+    }
+
+    function drawGameInCamera(predictions) {
+      if (!gameActive) return;
+      
+      // مسح canvas الكاميرا
+      cameraCtx.clearRect(0, 0, cameraCanvas.width, cameraCanvas.height);
+      
+      // رسم فيديو الكاميرا كخلفية (إذا كان وضع الكاميرا نشط)
+      if (cameraActive && !manualMode) {
+        cameraCtx.drawImage(video, 0, 0, cameraCanvas.width, cameraCanvas.height);
+        
+        // إضافة طبقة شفافة داكنة لتحسين رؤية العناصر
+        cameraCtx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+        cameraCtx.fillRect(0, 0, cameraCanvas.width, cameraCanvas.height);
+      }
+      
+      // رسم الثعبان
+      cameraCtx.beginPath();
+      for (let i = 1; i < snake.length; i++) {
+        const progress = i / snake.length;
+        const green = Math.floor(100 + 155 * progress);
+        cameraCtx.strokeStyle = `rgb(0, ${green}, 0)`;
+        cameraCtx.lineWidth = 12;
+        cameraCtx.lineCap = "round";
+        cameraCtx.lineJoin = "round";
+        
+        cameraCtx.beginPath();
+        cameraCtx.moveTo(snake[i-1].x, snake[i-1].y);
+        cameraCtx.lineTo(snake[i].x, snake[i].y);
+        cameraCtx.stroke();
+      }
+      
+      // رسم رأس الثعبان
+      const head = snake[snake.length - 1];
+      cameraCtx.beginPath();
+      cameraCtx.arc(head.x, head.y, 15, 0, Math.PI * 2);
+      cameraCtx.fillStyle = "lime";
+      cameraCtx.fill();
+      
+      // رسم التفاحة 🍎
+      cameraCtx.beginPath();
+      cameraCtx.arc(food.x, food.y, 25, 0, Math.PI * 2);
+      cameraCtx.fillStyle = "red";
+      cameraCtx.fill();
+      
+      // رسم ساق التفاحة
+      cameraCtx.beginPath();
+      cameraCtx.moveTo(food.x - 8, food.y - 25);
+      cameraCtx.lineTo(food.x, food.y - 35);
+      cameraCtx.lineTo(food.x + 8, food.y - 25);
+      cameraCtx.strokeStyle = "brown";
+      cameraCtx.lineWidth = 4;
+      cameraCtx.stroke();
+      
+      // رسم ورقة التفاحة
+      cameraCtx.beginPath();
+      cameraCtx.ellipse(food.x + 10, food.y - 30, 10, 6, Math.PI/4, 0, Math.PI * 2);
+      cameraCtx.fillStyle = "green";
+      cameraCtx.fill();
+      
+      // رسم نقاط اليد إذا تم اكتشافها (في وضع الكاميرا)
+      if (predictions.length > 0 && cameraActive && !manualMode) {
+        handDetected = true;
+        handIndicator.style.display = "none";
+        
+        const landmarks = predictions[0].landmarks;
+        
+        // رسم نقاط اليد
+        cameraCtx.fillStyle = "lime";
+        for (let i = 0; i < landmarks.length; i++) {
+          const x = landmarks[i][0];
+          const y = landmarks[i][1];
+          
+          cameraCtx.beginPath();
+          cameraCtx.arc(x, y, 4, 0, 2 * Math.PI);
+          cameraCtx.fill();
+        }
+        
+        // رسم إطار حول اليد
+        const boundingBox = predictions[0].boundingBox;
+        const startPoint = [boundingBox.topLeft[0], boundingBox.topLeft[1]];
+        const endPoint = [boundingBox.bottomRight[0], boundingBox.bottomRight[1]];
+        
+        cameraCtx.strokeStyle = "lime";
+        cameraCtx.lineWidth = 3;
+        cameraCtx.strokeRect(startPoint[0], startPoint[1], 
+                           endPoint[0] - startPoint[0], 
+                           endPoint[1] - startPoint[1]);
+        
+        // تمييز إصبع السبابة
+        const indexFinger = landmarks[8];
+        
+        cameraCtx.fillStyle = "red";
+        cameraCtx.beginPath();
+        cameraCtx.arc(indexFinger[0], indexFinger[1], 8, 0, 2 * Math.PI);
+        cameraCtx.fill();
+        
+        // رسم خط من إصبع السبابة إلى رأس الثعبان
+        cameraCtx.strokeStyle = "yellow";
+        cameraCtx.setLineDash([8, 8]);
+        cameraCtx.lineWidth = 3;
+        cameraCtx.beginPath();
+        cameraCtx.moveTo(indexFinger[0], indexFinger[1]);
+        cameraCtx.lineTo(head.x, head.y);
+        cameraCtx.stroke();
+        cameraCtx.setLineDash([]);
+      } else if (!manualMode) {
+        handDetected = false;
+        handIndicator.style.display = "block";
+      }
+    }
+
+    function checkCollision() {
+      const head = snake[snake.length - 1];
+      
+      // التحقق فقط من الاصطدام بالنفس (لا توجد جدران)
+      for (let i = 0; i < snake.length - 15; i++) {
+        const dx = head.x - snake[i].x;
+        const dy = head.y - snake[i].y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        
+        if (dist < 20) {
+          return true;
+        }
+      }
+      
+      return false;
+    }
+
+    function gameOver() {
+      gameActive = false;
+      finalScoreElement.textContent = "نقاطك النهائية: " + score;
+      gameOverScreen.style.display = "block";
+      overlay.style.display = "flex";
+    }
+
+    async function drawLoop() {
+      if (!gameActive) return;
+      
+      const currentTime = Date.now();
+      let predictions = [];
+      
+      if (manualMode) {
+        // وضع التحكم اليدوي باللمس
+        snake.push({x: mouseX, y: mouseY});
+        if (snake.length > maxLength) snake.shift();
+      } else if (currentTime - lastPredictionTime > predictionInterval && cameraActive) {
+        // وضع التحكم بالكاميرا
+        predictions = await model.estimateHands(video);
+        
+        if (predictions.length > 0) {
+          const x = predictions[0].landmarks[8][0];
+          const y = predictions[0].landmarks[8][1];
+          snake.push({x, y});
+          
+          if (snake.length > maxLength) snake.shift();
+        }
+        lastPredictionTime = currentTime;
+      }
+      
+      // التحقق من جمع الطعام
+      const head = snake[snake.length - 1];
+      const dx = head.x - food.x;
+      const dy = head.y - food.y;
+      const dist = Math.sqrt(dx*dx + dy*dy);
+      
+      if (dist < 35) {
+        createParticles(food.x, food.y, "red", 20);
+        randomFood();
+        maxLength += 5;
+        score++;
+        scoreElement.textContent = "النقاط: " + score;
+      }
+      
+      // التحقق من الاصطدام
+      if (checkCollision()) {
+        gameOver();
+        return;
+      }
+      
+      // رسم اللعبة في الكاميرا
+      drawGameInCamera(predictions);
+
+      requestAnimationFrame(drawLoop);
+    }
+
+    // تحديث موقع اللمس
+    cameraCanvas.addEventListener('touchmove', (e) => {
+      e.preventDefault();
+      const rect = cameraCanvas.getBoundingClientRect();
+      mouseX = e.touches[0].clientX - rect.left;
+      mouseY = e.touches[0].clientY - rect.top;
+    });
+
+    // تحديث موقع الماوس (للأجهزة التي تدعم الماوس)
+    cameraCanvas.addEventListener('mousemove', (e) => {
+      const rect = cameraCanvas.getBoundingClientRect();
+      mouseX = e.clientX - rect.left;
+      mouseY = e.clientY - rect.top;
+    });
+
+    // إعداد الأحداث
+    cameraSwitch.addEventListener("click", async () => {
+      if (manualMode) {
+        alert("لا يمكن تبديل الكاميرا في وضع التحكم اليدوي");
+        return;
+      }
+      
+      currentFacingMode = currentFacingMode === "environment" ? "user" : "environment";
+      const cameraReady = await setupCamera(currentFacingMode);
+      if (cameraReady && gameActive) {
+        video.play();
+      }
+    });
+
+    manualModeBtn.addEventListener("click", toggleManualMode);
+
+    startButton.addEventListener("click", async () => {
+      const cameraReady = await setupCamera(currentFacingMode);
+      if (cameraReady) {
+        video.play();
+        initGame();
+        drawLoop();
+      }
+    });
+
+    restartButton.addEventListener("click", () => {
+      initGame();
+      drawLoop();
+    });
+
+    retryButton.addEventListener("click", async () => {
+      const cameraReady = await setupCamera(currentFacingMode);
+      if (cameraReady) {
+        video.play();
+        permissionScreen.style.display = "none";
+        initGame();
+        drawLoop();
+      }
+    });
+
+    manualModeButton.addEventListener("click", enableManualMode);
+
+    // بدء التحميل
+    main();
+  </script>
 </body>
 </html>
